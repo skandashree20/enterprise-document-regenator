@@ -1,0 +1,113 @@
+{
+  "name": "12 - Corporate Overview Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for corporate overview generation\nconst item = $input.first().json;\n\nconst context = {\n  analyzed_documents: item.analyzed_documents || [],\n  company_snippet: item.company_snippet || {},\n  enrichment_data: item.enrichment_data || {},\n  generation_type: 'corporate_overview',\n  generation_started: new Date().toISOString()\n};\n\n// Extract key themes from analyzed documents\nconst allThemes = [];\nconst allKeyPoints = [];\nconst allQuotes = [];\n\nfor (const doc of context.analyzed_documents) {\n  if (doc.analysis) {\n    allThemes.push(...(doc.analysis.themes || []));\n    allKeyPoints.push(...(doc.analysis.key_points || []));\n    allQuotes.push(...(doc.analysis.quotes || []));\n  }\n}\n\ncontext.aggregated_themes = [...new Set(allThemes)].slice(0, 10);\ncontext.aggregated_key_points = [...new Set(allKeyPoints)].slice(0, 15);\ncontext.aggregated_quotes = [...new Set(allQuotes)].slice(0, 5);\n\nreturn [{ json: context }];"
+      },
+      "id": "prepare-context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a corporate communications specialist for OneOrigin, an EdTech company specializing in AIRR (transcript processing) and higher education services.\n\nYour task is to generate a professional Corporate Overview document that:\n- Clearly articulates OneOrigin's mission, vision, and values\n- Highlights key products and services (especially AIRR)\n- Demonstrates market leadership in EdTech/Higher Ed\n- Incorporates current industry trends and context\n- Is suitable for executive audiences, investors, and partners\n- Maintains a professional, confident, and forward-looking tone\n\nFormat the document in clean Markdown with clear sections."
+            },
+            {
+              "role": "user",
+              "content": "Generate a comprehensive Corporate Overview document for OneOrigin based on the following information:\n\n## COMPANY IDENTITY\n{{ $json.company_snippet.raw_content }}\n\n## KEY THEMES FROM INTERNAL DOCUMENTS\n{{ $json.aggregated_themes.join(', ') }}\n\n## KEY POINTS AND FACTS\n{{ $json.aggregated_key_points.join('\\n- ') }}\n\n## CURRENT INDUSTRY CONTEXT\nEdTech News:\n{{ JSON.stringify($json.enrichment_data.edtech_news?.slice(0, 3) || [], null, 2) }}\n\nHigher Ed Trends:\n{{ JSON.stringify($json.enrichment_data.higher_ed_trends?.slice(0, 3) || [], null, 2) }}\n\n---\n\nGenerate a 2-3 page Corporate Overview document with the following sections:\n1. Executive Summary\n2. About OneOrigin\n3. Our Mission & Vision\n4. Products & Solutions\n5. Services\n6. Market Opportunity\n7. Why OneOrigin\n8. Contact Information (placeholder)\n\nUse Markdown formatting. Make it compelling and professional."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 4000
+        }
+      },
+      "id": "openai-generate",
+      "name": "OpenAI - Generate Overview",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [440, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process generated content\nconst item = $input.first();\nconst content = item.json.message?.content || item.json.text || item.json.output || '';\nconst context = item.json;\n\nif (!content) {\n  return [{\n    json: {\n      status: 'error',\n      error_message: 'Failed to generate corporate overview',\n      generation_type: 'corporate_overview'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    document_type: 'corporate_overview',\n    title: 'OneOrigin Corporate Overview',\n    content: content,\n    format: 'markdown',\n    file_name: `OneOrigin_Corporate_Overview_${new Date().toISOString().split('T')[0]}.md`,\n    metadata: {\n      generated_at: new Date().toISOString(),\n      source_documents: context.analyzed_documents?.length || 0,\n      themes_used: context.aggregated_themes?.length || 0\n    },\n    status: 'generated'\n  }\n}];"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate Overview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate Overview": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

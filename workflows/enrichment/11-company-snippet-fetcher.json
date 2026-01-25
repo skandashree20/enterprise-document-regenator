@@ -1,0 +1,194 @@
+{
+  "name": "11 - Company Snippet Fetcher",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "company_doc_id",
+              "value": "CONFIGURE_YOUR_GOOGLE_DOC_ID_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-doc-id",
+      "name": "Set Document ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentId": "={{ $json.company_doc_id }}",
+        "simple": true
+      },
+      "id": "google-docs-get",
+      "name": "Google Docs - Get Content",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Docs OAuth2"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-content",
+              "leftValue": "={{ $json.body?.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-content",
+      "name": "Check Content Retrieved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract text content from Google Docs structure\nconst doc = $input.first().json;\nlet textContent = '';\n\n// Google Docs API returns content as an array of structural elements\nif (doc.body?.content) {\n  for (const element of doc.body.content) {\n    if (element.paragraph?.elements) {\n      for (const textElement of element.paragraph.elements) {\n        if (textElement.textRun?.content) {\n          textContent += textElement.textRun.content;\n        }\n      }\n    }\n  }\n}\n\n// Parse the snippet into structured sections\nconst snippet = {\n  raw_content: textContent.trim(),\n  title: doc.title || 'OneOrigin Company Identity',\n  last_updated: doc.revisionId ? new Date().toISOString() : null,\n  sections: {}\n};\n\n// Try to extract sections based on common headings\nconst sectionPatterns = {\n  mission: /mission[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  vision: /vision[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  values: /values[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  about: /about[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  products: /products?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  services: /services?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  differentiators: /differentiators?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  target_market: /target\\s*market[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i\n};\n\nfor (const [section, pattern] of Object.entries(sectionPatterns)) {\n  const match = textContent.match(pattern);\n  if (match) {\n    snippet.sections[section] = match[1].trim();\n  }\n}\n\nreturn [{\n  json: {\n    company_snippet: snippet,\n    status: 'success',\n    fetch_timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "extract-content",
+      "name": "Extract Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return default/fallback company snippet\nconst defaultSnippet = {\n  raw_content: `OneOrigin is an innovative EdTech company specializing in intelligent transcript processing and digital transformation solutions for higher education institutions.\n\nMission: To revolutionize how educational institutions manage, process, and leverage academic records through AI-powered automation.\n\nProducts:\n- AIRR: Advanced Intelligent Records & Reporting system for automated transcript processing\n- Digital credential management\n- Student lifecycle automation\n\nServices:\n- Higher education consulting\n- Digital transformation implementation\n- Compliance and regulatory guidance (FERPA, AAMVA)\n\nTarget Market: US higher education institutions including universities, colleges, community colleges, and state education agencies.\n\nDifferentiators:\n- AI-first approach to transcript processing\n- Deep expertise in higher education compliance\n- Proven track record with leading institutions`,\n  title: 'OneOrigin Company Identity (Default)',\n  sections: {\n    mission: 'To revolutionize how educational institutions manage, process, and leverage academic records through AI-powered automation.',\n    products: 'AIRR: Advanced Intelligent Records & Reporting system for automated transcript processing; Digital credential management; Student lifecycle automation',\n    services: 'Higher education consulting; Digital transformation implementation; Compliance and regulatory guidance (FERPA, AAMVA)',\n    target_market: 'US higher education institutions including universities, colleges, community colleges, and state education agencies.',\n    differentiators: 'AI-first approach to transcript processing; Deep expertise in higher education compliance; Proven track record with leading institutions'\n  }\n};\n\nreturn [{\n  json: {\n    company_snippet: defaultSnippet,\n    status: 'fallback',\n    message: 'Using default company snippet. Please configure your Google Doc ID.',\n    fetch_timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "fallback-snippet",
+      "name": "Fallback Snippet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {},
+      "id": "merge-output",
+      "name": "Merge Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Document ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Document ID": {
+      "main": [
+        [
+          {
+            "node": "Google Docs - Get Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Docs - Get Content": {
+      "main": [
+        [
+          {
+            "node": "Check Content Retrieved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Content Retrieved": {
+      "main": [
+        [
+          {
+            "node": "Extract Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback Snippet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback Snippet": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "enrichment"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

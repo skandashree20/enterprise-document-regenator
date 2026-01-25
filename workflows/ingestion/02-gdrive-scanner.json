@@ -1,0 +1,207 @@
+{
+  "name": "02 - Google Drive Scanner",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "supported_types",
+              "value": "pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls"
+            }
+          ],
+          "number": [
+            {
+              "name": "max_files_per_folder",
+              "value": 1000
+            }
+          ],
+          "boolean": [
+            {
+              "name": "include_shared_drives",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-params",
+      "name": "Set Scan Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get folder IDs from input or use defaults\nconst folderIds = $input.first().json.folder_ids || [];\n\nif (folderIds.length === 0) {\n  throw new Error('No folder IDs provided. Please configure source_folder_ids in the orchestrator.');\n}\n\n// Output each folder ID as separate item for processing\nreturn folderIds.map(folderId => ({\n  json: {\n    folder_id: folderId,\n    supported_types: $input.first().json.supported_types,\n    max_files_per_folder: $input.first().json.max_files_per_folder,\n    include_shared_drives: $input.first().json.include_shared_drives\n  }\n}));"
+      },
+      "id": "split-folders",
+      "name": "Split Folder IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.folder_id }}"
+        },
+        "options": {
+          "fields": ["id", "name", "mimeType", "modifiedTime", "size", "owners", "webViewLink"],
+          "filter": "mimeType != 'application/vnd.google-apps.folder'",
+          "spaces": "={{ $json.include_shared_drives ? 'drive' : 'drive' }}"
+        }
+      },
+      "id": "gdrive-list",
+      "name": "Google Drive - List Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [660, 0],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter files by supported extensions\nconst supportedTypes = ($input.first().json.supported_types || 'pdf,docx,doc,pptx,ppt,txt,md').split(',');\nconst items = $input.all();\nconst filteredItems = [];\n\nfor (const item of items) {\n  const fileName = item.json.name || '';\n  const extension = fileName.split('.').pop()?.toLowerCase() || '';\n  \n  // Check if file extension is supported\n  if (supportedTypes.includes(extension)) {\n    filteredItems.push({\n      json: {\n        file_id: item.json.id,\n        file_name: item.json.name,\n        mime_type: item.json.mimeType,\n        extension: extension,\n        modified_time: item.json.modifiedTime,\n        size: item.json.size,\n        owners: item.json.owners,\n        web_link: item.json.webViewLink,\n        source_folder_id: item.json.folder_id\n      }\n    });\n  }\n}\n\n// Add scan metadata\nif (filteredItems.length > 0) {\n  filteredItems[0].json.scan_metadata = {\n    total_files_found: filteredItems.length,\n    scan_timestamp: new Date().toISOString(),\n    supported_types: supportedTypes\n  };\n}\n\nreturn filteredItems;"
+      },
+      "id": "filter-files",
+      "name": "Filter by Extension",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "documents",
+        "include": "allFieldsExcept",
+        "fieldsToExclude": "scan_metadata",
+        "options": {}
+      },
+      "id": "aggregate-docs",
+      "name": "Aggregate Documents",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "success"
+            }
+          ],
+          "number": [
+            {
+              "name": "total_documents",
+              "value": "={{ $json.documents.length }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-output",
+      "name": "Set Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Scan Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Scan Parameters": {
+      "main": [
+        [
+          {
+            "node": "Split Folder IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Folder IDs": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - List Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - List Files": {
+      "main": [
+        [
+          {
+            "node": "Filter by Extension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter by Extension": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Documents": {
+      "main": [
+        [
+          {
+            "node": "Set Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "ingestion"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

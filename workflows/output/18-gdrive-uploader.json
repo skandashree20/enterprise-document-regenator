@@ -1,0 +1,214 @@
+{
+  "name": "18 - Google Drive Uploader",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare document for upload\nconst item = $input.first().json;\n\nconst uploadRequest = {\n  document_type: item.document_type,\n  title: item.title,\n  content: item.content,\n  file_name: item.file_name || `Document_${new Date().toISOString().split('T')[0]}.md`,\n  format: item.format || 'markdown',\n  metadata: item.metadata || {},\n  visuals: item.visuals || [],\n  output_folder_id: item.output_folder_id || $env.GDRIVE_OUTPUT_FOLDER_ID || 'CONFIGURE_OUTPUT_FOLDER'\n};\n\nreturn [{ json: uploadRequest }];"
+      },
+      "id": "prepare-upload",
+      "name": "Prepare Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert markdown content to file binary\nconst item = $input.first();\nconst content = item.json.content;\nconst fileName = item.json.file_name;\n\n// Create binary data from content\nconst binaryData = Buffer.from(content, 'utf-8').toString('base64');\n\nreturn [{\n  json: item.json,\n  binary: {\n    data: {\n      data: binaryData,\n      mimeType: 'text/markdown',\n      fileName: fileName\n    }\n  }\n}];"
+      },
+      "id": "create-binary",
+      "name": "Create Binary Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "={{ $json.file_name }}",
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.output_folder_id }}"
+        },
+        "options": {
+          "simplifyOutput": true
+        }
+      },
+      "id": "gdrive-upload",
+      "name": "Google Drive - Upload",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [660, 0],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Drive OAuth2"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-upload",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-upload",
+      "name": "Check Upload Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format success response\nconst item = $input.first();\n\nreturn [{\n  json: {\n    status: 'uploaded',\n    file_id: item.json.id,\n    file_name: item.json.name,\n    web_link: item.json.webViewLink,\n    folder_id: item.json.parents?.[0],\n    uploaded_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "format-success",
+      "name": "Format Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format error response\nconst item = $input.first();\n\nreturn [{\n  json: {\n    status: 'upload_failed',\n    error: item.json.error?.message || 'Unknown upload error',\n    file_name: item.json.file_name,\n    attempted_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "format-error",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {},
+      "id": "merge-output",
+      "name": "Merge Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Upload": {
+      "main": [
+        [
+          {
+            "node": "Create Binary Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Binary Data": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload": {
+      "main": [
+        [
+          {
+            "node": "Check Upload Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Upload Success": {
+      "main": [
+        [
+          {
+            "node": "Format Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Success": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "output"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

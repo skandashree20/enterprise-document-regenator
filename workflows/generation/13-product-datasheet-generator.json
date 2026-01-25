@@ -1,0 +1,113 @@
+{
+  "name": "13 - Product Datasheet Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for product datasheet generation\nconst item = $input.first().json;\n\nconst context = {\n  analyzed_documents: item.analyzed_documents || [],\n  company_snippet: item.company_snippet || {},\n  enrichment_data: item.enrichment_data || {},\n  product_name: item.product_name || 'AIRR',\n  generation_type: 'product_datasheet',\n  generation_started: new Date().toISOString()\n};\n\n// Extract product-specific information\nconst productInfo = {\n  features: [],\n  benefits: [],\n  technical_specs: [],\n  use_cases: [],\n  integrations: []\n};\n\nfor (const doc of context.analyzed_documents) {\n  if (doc.analysis) {\n    // Look for product-related entities\n    const products = doc.analysis.entities?.products || [];\n    const technologies = doc.analysis.entities?.technologies || [];\n    \n    productInfo.integrations.push(...technologies);\n    \n    // Extract key points that might be features/benefits\n    const keyPoints = doc.analysis.key_points || [];\n    for (const point of keyPoints) {\n      if (point.toLowerCase().includes('feature') || point.toLowerCase().includes('capability')) {\n        productInfo.features.push(point);\n      } else if (point.toLowerCase().includes('benefit') || point.toLowerCase().includes('value')) {\n        productInfo.benefits.push(point);\n      }\n    }\n  }\n}\n\ncontext.product_info = {\n  features: [...new Set(productInfo.features)].slice(0, 10),\n  benefits: [...new Set(productInfo.benefits)].slice(0, 8),\n  integrations: [...new Set(productInfo.integrations)].slice(0, 6)\n};\n\nreturn [{ json: context }];"
+      },
+      "id": "prepare-context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a technical writer for OneOrigin, specializing in creating product datasheets for EdTech solutions.\n\nYour task is to generate a professional Product Datasheet that:\n- Clearly describes the product's purpose and value proposition\n- Lists key features and capabilities\n- Highlights technical specifications where available\n- Includes use cases and benefits\n- Is suitable for IT decision-makers, procurement teams, and technical evaluators\n- Maintains a balance between technical depth and accessibility\n\nFormat the document in clean Markdown optimized for conversion to PDF."
+            },
+            {
+              "role": "user",
+              "content": "Generate a comprehensive Product Datasheet for {{ $json.product_name || 'AIRR' }} based on the following information:\n\n## PRODUCT CONTEXT\nProduct: {{ $json.product_name || 'AIRR - Advanced Intelligent Records & Reporting' }}\n\n## COMPANY BACKGROUND\n{{ $json.company_snippet.raw_content }}\n\n## EXTRACTED PRODUCT INFORMATION\nFeatures: {{ $json.product_info.features.join(', ') || 'AI-powered transcript processing, automated data extraction, compliance validation' }}\nBenefits: {{ $json.product_info.benefits.join(', ') || 'Reduced processing time, improved accuracy, compliance assurance' }}\nIntegrations: {{ $json.product_info.integrations.join(', ') || 'SIS systems, LMS platforms, state reporting systems' }}\n\n## CURRENT INDUSTRY TRENDS\n{{ JSON.stringify($json.enrichment_data.transcript_tech?.slice(0, 2) || [], null, 2) }}\n\n---\n\nGenerate a 1-2 page Product Datasheet with the following sections:\n1. Product Overview (brief description + hero statement)\n2. Key Features (bullet points)\n3. Benefits (with icons/emojis for visual appeal)\n4. Technical Specifications\n5. Use Cases\n6. Integration Capabilities\n7. Compliance & Security\n8. Getting Started / Contact\n\nUse Markdown formatting. Make it scannable and visually organized."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 3000
+        }
+      },
+      "id": "openai-generate",
+      "name": "OpenAI - Generate Datasheet",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [440, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process generated content\nconst item = $input.first();\nconst content = item.json.message?.content || item.json.text || item.json.output || '';\nconst context = item.json;\nconst productName = context.product_name || 'AIRR';\n\nif (!content) {\n  return [{\n    json: {\n      status: 'error',\n      error_message: 'Failed to generate product datasheet',\n      generation_type: 'product_datasheet',\n      product_name: productName\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    document_type: 'product_datasheet',\n    title: `${productName} Product Datasheet`,\n    product_name: productName,\n    content: content,\n    format: 'markdown',\n    file_name: `${productName.replace(/\\s+/g, '_')}_Datasheet_${new Date().toISOString().split('T')[0]}.md`,\n    metadata: {\n      generated_at: new Date().toISOString(),\n      source_documents: context.analyzed_documents?.length || 0\n    },\n    status: 'generated'\n  }\n}];"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate Datasheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate Datasheet": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

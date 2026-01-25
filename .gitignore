@@ -1,0 +1,46 @@
+# Environment files
+.env
+*.env.local
+*.env.*.local
+
+# Docker volumes
+docker/local-files/
+docker/n8n_data/
+docker/postgres_data/
+
+# Backup directories
+workflows-backup/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Credentials (should never be committed)
+*credentials*.json
+*service-account*.json
+*.pem
+*.key
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if any custom scripts)
+node_modules/
+
+# Python (if any custom scripts)
+__pycache__/
+*.pyc
+.venv/
+venv/

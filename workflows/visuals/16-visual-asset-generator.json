@@ -1,0 +1,185 @@
+{
+  "name": "16 - Visual Asset Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare content for visual generation\nconst item = $input.first().json;\n\nconst generatedDoc = {\n  document_type: item.document_type,\n  title: item.title,\n  content: item.content,\n  client_name: item.client_name\n};\n\n// Determine what visuals are needed based on document type\nlet visualRequests = [];\n\nswitch (item.document_type) {\n  case 'corporate_overview':\n    visualRequests = [\n      { type: 'hero_banner', description: 'Corporate hero image with OneOrigin branding' },\n      { type: 'infographic', description: 'Company at a glance infographic' },\n      { type: 'product_diagram', description: 'Product ecosystem diagram' }\n    ];\n    break;\n  case 'product_datasheet':\n    visualRequests = [\n      { type: 'product_screenshot', description: 'Product interface mockup' },\n      { type: 'feature_icons', description: 'Feature icons set' },\n      { type: 'workflow_diagram', description: 'Product workflow diagram' }\n    ];\n    break;\n  case 'higher_ed_onepager':\n    visualRequests = [\n      { type: 'infographic', description: 'Higher ed challenges infographic' },\n      { type: 'stats_visual', description: 'Statistics and metrics visual' }\n    ];\n    break;\n  case 'client_document':\n    visualRequests = [\n      { type: 'custom_banner', description: `Custom banner for ${item.client_name || 'client'}` },\n      { type: 'implementation_timeline', description: 'Implementation timeline visual' }\n    ];\n    break;\n  default:\n    visualRequests = [\n      { type: 'generic_banner', description: 'Generic document header' }\n    ];\n}\n\nreturn [{\n  json: {\n    generated_document: generatedDoc,\n    visual_requests: visualRequests,\n    generation_started: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-visuals",
+      "name": "Prepare Visual Requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a visual design strategist. Based on document content, generate detailed prompts for AI image generation.\n\nFor each visual type requested, create a detailed prompt suitable for image generation AI (like DALL-E, Midjourney, or Stable Diffusion).\n\nFocus on:\n- Professional, corporate aesthetics\n- EdTech/Higher Education context\n- Clean, modern design\n- Appropriate color schemes (blues, greens, professional tones)\n- Clear visual hierarchy\n\nRespond with JSON array of image prompts."
+            },
+            {
+              "role": "user",
+              "content": "Generate image prompts for the following document:\n\nDocument Type: {{ $json.generated_document.document_type }}\nTitle: {{ $json.generated_document.title }}\n\nVisual Requests:\n{{ JSON.stringify($json.visual_requests, null, 2) }}\n\nDocument Content Summary:\n{{ $json.generated_document.content.substring(0, 1000) }}...\n\n---\n\nRespond with a JSON array:\n[\n  {\n    \"visual_type\": \"type from request\",\n    \"prompt\": \"detailed image generation prompt\",\n    \"style\": \"professional/modern/minimal\",\n    \"dimensions\": \"16:9 or 1:1 or 4:3\",\n    \"color_palette\": [\"hex colors\"]\n  }\n]"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 2000,
+          "responseFormat": "json_object"
+        }
+      },
+      "id": "generate-prompts",
+      "name": "Generate Image Prompts",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [440, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse prompts and prepare for image generation\nconst item = $input.first();\nlet imagePrompts = [];\n\ntry {\n  const response = item.json.message?.content || item.json.text || item.json.output || '';\n  const parsed = typeof response === 'string' ? JSON.parse(response) : response;\n  imagePrompts = parsed.prompts || parsed || [];\n} catch (e) {\n  // Create default prompts if parsing fails\n  imagePrompts = [{\n    visual_type: 'banner',\n    prompt: 'Professional corporate banner for EdTech company, modern design, blue and green colors, clean minimal style',\n    style: 'professional',\n    dimensions: '16:9',\n    color_palette: ['#003366', '#00A86B', '#FFFFFF']\n  }];\n}\n\n// Output each prompt as separate item for parallel processing\nreturn imagePrompts.map((prompt, index) => ({\n  json: {\n    ...prompt,\n    index: index,\n    document_type: item.json.generated_document?.document_type,\n    document_title: item.json.generated_document?.title\n  }\n}));"
+      },
+      "id": "parse-prompts",
+      "name": "Parse Image Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "17 - Figma Integration"
+        },
+        "options": {}
+      },
+      "id": "call-figma",
+      "name": "Generate via Figma/Nano Banana",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [880, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "generated_visuals",
+        "options": {}
+      },
+      "id": "aggregate-visuals",
+      "name": "Aggregate Visuals",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine generated visuals with document\nconst item = $input.first();\nconst visuals = item.json.generated_visuals || [];\n\nreturn [{\n  json: {\n    status: 'visuals_generated',\n    visual_count: visuals.length,\n    visuals: visuals,\n    generation_completed: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "finalize-output",
+      "name": "Finalize Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Visual Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Visual Requests": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Parse Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Generate via Figma/Nano Banana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate via Figma/Nano Banana": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Visuals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Visuals": {
+      "main": [
+        [
+          {
+            "node": "Finalize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "visuals"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

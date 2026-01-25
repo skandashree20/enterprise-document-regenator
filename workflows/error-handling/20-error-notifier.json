@@ -1,0 +1,201 @@
+{
+  "name": "20 - Error Notifier",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Google Chat notification card\nconst item = $input.first().json;\n\nconst priorityColors = {\n  'auth_failure': '#FF0000',\n  'quota_exceeded': '#FF0000',\n  'rate_limit': '#FFA500',\n  'server_error': '#FFA500',\n  'network_error': '#FFA500',\n  'validation_error': '#FFFF00',\n  'unknown': '#808080'\n};\n\nconst priorityLabels = {\n  'auth_failure': 'HIGH',\n  'quota_exceeded': 'HIGH',\n  'rate_limit': 'MEDIUM',\n  'server_error': 'MEDIUM',\n  'network_error': 'MEDIUM',\n  'validation_error': 'LOW',\n  'unknown': 'LOW'\n};\n\nconst errorType = item.error_type || 'unknown';\nconst priority = priorityLabels[errorType] || 'LOW';\n\n// Google Chat Card format\nconst chatCard = {\n  cards: [{\n    header: {\n      title: '🚨 Document Regeneration Error',\n      subtitle: `${item.workflow_name || 'Unknown Workflow'} - ${priority} Priority`,\n      imageUrl: 'https://developers.google.com/chat/images/quickstart-app-avatar.png',\n      imageStyle: 'AVATAR'\n    },\n    sections: [\n      {\n        widgets: [\n          {\n            keyValue: {\n              topLabel: 'Error ID',\n              content: item.error_id || 'N/A'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Error Type',\n              content: errorType.replace('_', ' ').toUpperCase()\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Node',\n              content: item.node_name || 'Unknown'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Time',\n              content: item.timestamp || new Date().toISOString()\n            }\n          }\n        ]\n      },\n      {\n        header: 'Error Message',\n        widgets: [\n          {\n            textParagraph: {\n              text: (item.error_message || 'No error message available').substring(0, 500)\n            }\n          }\n        ]\n      },\n      {\n        widgets: [\n          {\n            buttons: [\n              {\n                textButton: {\n                  text: 'View in n8n',\n                  onClick: {\n                    openLink: {\n                      url: `${$env.N8N_HOST || 'http://localhost:5678'}/workflow/${item.workflow_id || ''}`\n                    }\n                  }\n                }\n              }\n            ]\n          }\n        ]\n      }\n    ]\n  }]\n};\n\nreturn [{\n  json: {\n    chat_card: chatCard,\n    priority: priority,\n    error_type: errorType,\n    requires_action: item.requires_manual_intervention === 'true'\n  }\n}];"
+      },
+      "id": "build-card",
+      "name": "Build Chat Card",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.GOOGLE_CHAT_WEBHOOK_URL || 'https://chat.googleapis.com/v1/spaces/SPACE_ID/messages?key=KEY&token=TOKEN' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.chat_card) }}",
+        "options": {}
+      },
+      "id": "send-notification",
+      "name": "Send to Google Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-high-priority",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "HIGH",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-priority",
+      "name": "Check High Priority",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log high priority alert - could add email/SMS here\nconst item = $input.first();\n\n// Placeholder for additional high-priority notification\n// Could integrate with:\n// - Email (SendGrid, SMTP)\n// - SMS (Twilio)\n// - PagerDuty\n// - Slack\n\nreturn [{\n  json: {\n    high_priority_logged: true,\n    error_type: item.json.error_type,\n    message: 'High priority error - additional notification would be sent here',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "high-priority-action",
+      "name": "High Priority Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {},
+      "id": "no-op",
+      "name": "No Additional Action",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {},
+      "id": "merge-output",
+      "name": "Merge Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final notification result\nconst item = $input.first();\n\nreturn [{\n  json: {\n    notification_sent: true,\n    channel: 'google_chat',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "finalize",
+      "name": "Finalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Chat Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Chat Card": {
+      "main": [
+        [
+          {
+            "node": "Send to Google Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Google Chat": {
+      "main": [
+        [
+          {
+            "node": "Check High Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check High Priority": {
+      "main": [
+        [
+          {
+            "node": "High Priority Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Additional Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Priority Action": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Additional Action": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Output": {
+      "main": [
+        [
+          {
+            "node": "Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "error-handling"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

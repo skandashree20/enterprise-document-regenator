@@ -1,0 +1,246 @@
+{
+  "name": "07 - Generic Processor",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generic processor for text-based files (txt, md, csv, json, pptx, xlsx, etc.)\nconst item = $input.first();\nconst fileInfo = item.json;\nconst binaryData = item.binary?.data;\nconst extension = (fileInfo.extension || '').toLowerCase();\n\nif (!binaryData) {\n  return [{\n    json: {\n      ...fileInfo,\n      status: 'error',\n      error_message: 'No binary data found for extraction'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    mime_type: fileInfo.mime_type,\n    extension: extension,\n    processor_type: 'generic',\n    processing_started: new Date().toISOString()\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "prepare-file",
+      "name": "Prepare File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.extension }}",
+                    "rightValue": "pptx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "PPTX"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.extension }}",
+                    "rightValue": "xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "XLSX"
+            }
+          ],
+          "fallbackOutput": {
+            "renameOutput": true,
+            "outputKey": "Text"
+          }
+        },
+        "options": {}
+      },
+      "id": "route-by-extension",
+      "name": "Route by Extension",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "extract-pptx",
+      "name": "Extract PPTX",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [660, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "extract-xlsx",
+      "name": "Extract XLSX",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [660, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle text-based files (txt, md, csv, json)\nconst item = $input.first();\nconst binaryData = item.binary?.data;\n\nif (!binaryData) {\n  return [{\n    json: {\n      ...item.json,\n      status: 'error',\n      error_message: 'No binary data found'\n    }\n  }];\n}\n\n// Try to decode text content from binary\nlet textContent = '';\ntry {\n  // n8n stores binary as base64\n  const buffer = Buffer.from(binaryData.data, 'base64');\n  textContent = buffer.toString('utf-8');\n} catch (e) {\n  return [{\n    json: {\n      ...item.json,\n      status: 'error',\n      error_message: 'Failed to decode text content: ' + e.message\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...item.json,\n    text: textContent\n  }\n}];"
+      },
+      "id": "extract-text",
+      "name": "Extract Text Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 150]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-extractions",
+      "name": "Merge Extractions",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process extracted content from any file type\nconst item = $input.first();\nconst extractedText = item.json.text || item.json.data || '';\nconst metadata = item.json;\n\nif (!extractedText) {\n  return [{\n    json: {\n      file_id: metadata.file_id,\n      file_name: metadata.file_name,\n      mime_type: metadata.mime_type,\n      extension: metadata.extension,\n      extracted_text: '',\n      word_count: 0,\n      char_count: 0,\n      status: 'error',\n      error_message: 'No text content could be extracted',\n      processor_type: 'generic',\n      processing_completed: new Date().toISOString()\n    }\n  }];\n}\n\n// Clean up the text\nconst cleanText = extractedText\n  .replace(/\\s+/g, ' ')  // Normalize whitespace\n  .replace(/\\n{3,}/g, '\\n\\n')  // Reduce excessive newlines\n  .trim();\n\n// Get word count and basic stats\nconst wordCount = cleanText.split(/\\s+/).filter(w => w.length > 0).length;\nconst charCount = cleanText.length;\n\nreturn [{\n  json: {\n    file_id: metadata.file_id,\n    file_name: metadata.file_name,\n    mime_type: metadata.mime_type,\n    extension: metadata.extension,\n    extracted_text: cleanText,\n    word_count: wordCount,\n    char_count: charCount,\n    status: 'processed',\n    processor_type: 'generic',\n    processing_completed: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "process-content",
+      "name": "Process Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File": {
+      "main": [
+        [
+          {
+            "node": "Route by Extension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Extension": {
+      "main": [
+        [
+          {
+            "node": "Extract PPTX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Text Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PPTX": {
+      "main": [
+        [
+          {
+            "node": "Merge Extractions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract XLSX": {
+      "main": [
+        [
+          {
+            "node": "Merge Extractions",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Extract Text Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Extractions",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Extractions": {
+      "main": [
+        [
+          {
+            "node": "Process Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "processing"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

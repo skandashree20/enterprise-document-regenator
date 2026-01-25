@@ -1,0 +1,311 @@
+{
+  "name": "15 - Client Document Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for client-specific document generation\nconst item = $input.first().json;\n\n// Client configuration (can be passed in or loaded from config)\nconst clientConfig = item.client_config || {\n  client_name: item.client_name || 'University Partner',\n  short_name: item.short_name || 'Partner',\n  branding: {\n    primary_color: '#003366',\n    secondary_color: '#FFD700'\n  },\n  document_types: ['proposal', 'one-pager', 'integration-guide'],\n  custom_context: item.custom_context || ''\n};\n\nconst context = {\n  analyzed_documents: item.analyzed_documents || [],\n  company_snippet: item.company_snippet || {},\n  enrichment_data: item.enrichment_data || {},\n  client_config: clientConfig,\n  document_type: item.document_type || 'proposal',\n  generation_type: 'client_document',\n  generation_started: new Date().toISOString()\n};\n\n// Extract client-related information from analyzed documents\nconst clientInfo = {\n  mentions: [],\n  related_content: []\n};\n\nfor (const doc of context.analyzed_documents) {\n  if (doc.analysis) {\n    const clients = doc.analysis.entities?.clients || [];\n    // Check if this document mentions the target client\n    for (const client of clients) {\n      if (client.toLowerCase().includes(clientConfig.short_name.toLowerCase()) ||\n          client.toLowerCase().includes(clientConfig.client_name.toLowerCase())) {\n        clientInfo.mentions.push(doc.file_name);\n        clientInfo.related_content.push(doc.analysis.summary || '');\n      }\n    }\n  }\n}\n\ncontext.client_info = clientInfo;\n\nreturn [{ json: context }];"
+      },
+      "id": "prepare-context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.document_type }}",
+                    "rightValue": "proposal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Proposal"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.document_type }}",
+                    "rightValue": "integration-guide",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Integration"
+            }
+          ],
+          "fallbackOutput": {
+            "renameOutput": true,
+            "outputKey": "OnePager"
+          }
+        },
+        "options": {}
+      },
+      "id": "route-doc-type",
+      "name": "Route by Doc Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a business development specialist creating customized proposals for university clients.\n\nGenerate a professional proposal that:\n- Is personalized to the specific client\n- Addresses their unique challenges and needs\n- Proposes specific solutions from OneOrigin's portfolio\n- Includes implementation approach and timeline\n- Provides pricing framework (high-level)\n- Has clear next steps\n\nFormat in professional Markdown."
+            },
+            {
+              "role": "user",
+              "content": "Generate a customized Proposal for {{ $json.client_config.client_name }}:\n\n## CLIENT INFORMATION\nName: {{ $json.client_config.client_name }}\nContext: {{ $json.client_config.custom_context || 'Leading higher education institution' }}\n\n## ONEORIGIN BACKGROUND\n{{ $json.company_snippet.raw_content }}\n\n## RELEVANT INTERNAL CONTEXT\n{{ $json.client_info.related_content.join('\\n') || 'No specific historical context available' }}\n\n---\n\nGenerate a proposal with:\n1. Executive Summary (personalized to client)\n2. Understanding of Client Needs\n3. Proposed Solution\n4. Implementation Approach\n5. Timeline & Milestones\n6. Investment Overview\n7. Why OneOrigin\n8. Next Steps"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 4000
+        }
+      },
+      "id": "generate-proposal",
+      "name": "Generate Proposal",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [660, -150],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a technical writer creating integration guides for university IT teams.\n\nGenerate a technical integration guide that:\n- Is specific to the client's likely tech stack\n- Provides clear implementation steps\n- Includes API documentation overview\n- Covers security and compliance requirements\n- Has troubleshooting guidance\n\nFormat in technical Markdown with code examples where relevant."
+            },
+            {
+              "role": "user",
+              "content": "Generate an Integration Guide for {{ $json.client_config.client_name }}:\n\n## CLIENT INFORMATION\nName: {{ $json.client_config.client_name }}\n\n## ONEORIGIN TECHNICAL CONTEXT\n{{ $json.company_snippet.raw_content }}\n\n---\n\nGenerate a technical integration guide with:\n1. Introduction & Prerequisites\n2. Architecture Overview\n3. API Authentication\n4. Data Integration Steps\n5. SIS/LMS Connectivity\n6. Security & Compliance\n7. Testing & Validation\n8. Support & Troubleshooting"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.5,
+          "maxTokens": 4000
+        }
+      },
+      "id": "generate-integration",
+      "name": "Generate Integration Guide",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [660, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a marketing specialist creating client-specific one-pagers.\n\nGenerate a one-pager that:\n- Is personalized to the specific client\n- Highlights relevant solutions for their needs\n- Is scannable and visually organized\n- Has clear value propositions\n- Includes a call-to-action\n\nFormat as a single-page document in Markdown."
+            },
+            {
+              "role": "user",
+              "content": "Generate a Client One-Pager for {{ $json.client_config.client_name }}:\n\n## CLIENT INFORMATION\nName: {{ $json.client_config.client_name }}\nContext: {{ $json.client_config.custom_context || 'Higher education institution' }}\n\n## ONEORIGIN SOLUTIONS\n{{ $json.company_snippet.raw_content }}\n\n---\n\nGenerate a ONE-PAGE document with:\n1. Personalized Headline\n2. Client-Specific Challenges\n3. Tailored Solutions\n4. Key Benefits for This Client\n5. Next Steps / CTA"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 2000
+        }
+      },
+      "id": "generate-onepager",
+      "name": "Generate Client One-Pager",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [660, 150],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-results",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process generated content\nconst item = $input.first();\nconst content = item.json.message?.content || item.json.text || item.json.output || '';\nconst context = item.json;\nconst clientName = context.client_config?.client_name || 'Client';\nconst shortName = context.client_config?.short_name || 'Client';\nconst docType = context.document_type || 'proposal';\n\nif (!content) {\n  return [{\n    json: {\n      status: 'error',\n      error_message: 'Failed to generate client document',\n      generation_type: 'client_document',\n      client_name: clientName\n    }\n  }];\n}\n\nconst docTypeLabels = {\n  'proposal': 'Proposal',\n  'integration-guide': 'Integration_Guide',\n  'one-pager': 'OnePager'\n};\n\nreturn [{\n  json: {\n    document_type: 'client_document',\n    sub_type: docType,\n    title: `${clientName} - ${docTypeLabels[docType] || 'Document'}`,\n    client_name: clientName,\n    content: content,\n    format: 'markdown',\n    file_name: `${shortName.replace(/\\s+/g, '_')}_${docTypeLabels[docType] || 'Document'}_${new Date().toISOString().split('T')[0]}.md`,\n    metadata: {\n      generated_at: new Date().toISOString(),\n      client_config: context.client_config,\n      related_documents: context.client_info?.mentions || []\n    },\n    status: 'generated'\n  }\n}];"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context": {
+      "main": [
+        [
+          {
+            "node": "Route by Doc Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Doc Type": {
+      "main": [
+        [
+          {
+            "node": "Generate Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Integration Guide",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Client One-Pager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Proposal": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Integration Guide": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Generate Client One-Pager": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

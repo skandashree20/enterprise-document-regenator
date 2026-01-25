@@ -1,0 +1,595 @@
+{
+  "name": "01 - Main Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "run-regeneration",
+        "options": {}
+      },
+      "id": "manual-trigger",
+      "name": "Manual Trigger (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "webhookId": "run-regeneration"
+    },
+    {
+      "parameters": {},
+      "id": "merge-triggers",
+      "name": "Merge Triggers",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [220, 100]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "execution_id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "start_time",
+              "value": "={{ $now.toISOString() }}"
+            }
+          ],
+          "object": [
+            {
+              "name": "config",
+              "value": "={\n  \"source_folder_ids\": {{ JSON.stringify($json.folder_ids || [$env.GDRIVE_SOURCE_FOLDER_ID || 'CONFIGURE_SOURCE_FOLDER']) }},\n  \"output_folder_id\": \"{{ $json.output_folder_id || $env.GDRIVE_OUTPUT_FOLDER_ID || 'CONFIGURE_OUTPUT_FOLDER' }}\",\n  \"batch_size\": 5,\n  \"document_types\": [\"corporate_overview\", \"product_datasheet\", \"higher_ed_onepager\", \"client_document\"]\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "init-vars",
+      "name": "Initialize Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "11 - Company Snippet Fetcher"
+        },
+        "options": {}
+      },
+      "id": "fetch-snippet",
+      "name": "Fetch Company Snippet",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [660, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "10 - External Data Enricher"
+        },
+        "options": {}
+      },
+      "id": "fetch-enrichment",
+      "name": "Fetch Enrichment Data",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [660, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-context",
+      "name": "Merge Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all context data\nconst items = $input.all();\n\nlet context = {\n  company_snippet: null,\n  enrichment_data: null,\n  config: null\n};\n\nfor (const item of items) {\n  if (item.json.company_snippet) {\n    context.company_snippet = item.json.company_snippet;\n  }\n  if (item.json.edtech_news || item.json.ferpa_updates) {\n    context.enrichment_data = item.json;\n  }\n  if (item.json.config) {\n    context.config = typeof item.json.config === 'string' \n      ? JSON.parse(item.json.config) \n      : item.json.config;\n  }\n}\n\nreturn [{ json: context }];"
+      },
+      "id": "combine-context",
+      "name": "Combine Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "02 - Google Drive Scanner"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "folder_ids": "={{ $json.config.source_folder_ids }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "scan-drive",
+      "name": "Scan Google Drive",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1320, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process scanned documents and prepare for batch processing\nconst item = $input.first();\nconst documents = item.json.documents || [];\nconst context = item.json;\n\nif (documents.length === 0) {\n  return [{\n    json: {\n      status: 'no_documents',\n      message: 'No documents found to process',\n      context: context\n    }\n  }];\n}\n\n// Output each document for parallel processing\nreturn documents.map(doc => ({\n  json: {\n    ...doc,\n    company_snippet: context.company_snippet,\n    enrichment_data: context.enrichment_data,\n    config: context.config\n  }\n}));"
+      },
+      "id": "prepare-docs",
+      "name": "Prepare Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 100]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "batch-docs",
+      "name": "Batch Documents",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "03 - Document Fetcher"
+        },
+        "options": {}
+      },
+      "id": "fetch-doc",
+      "name": "Fetch Document",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1980, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "04 - Batch Router"
+        },
+        "options": {}
+      },
+      "id": "process-batch",
+      "name": "Process Batch",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [2200, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze documents using alternating LLMs\nconst item = $input.first();\nconst documents = item.json.processed_documents || [];\nconst index = item.json.batch_index || 0;\n\n// Use alternating analyzers\nconst analyzerWorkflow = index % 2 === 0 \n  ? '08 - Document Analyzer OpenAI'\n  : '09 - Document Analyzer Gemini';\n\nreturn documents.map((doc, i) => ({\n  json: {\n    ...doc,\n    analyzer_workflow: i % 2 === 0 ? '08 - Document Analyzer OpenAI' : '09 - Document Analyzer Gemini',\n    company_snippet: item.json.company_snippet,\n    enrichment_data: item.json.enrichment_data\n  }\n}));"
+      },
+      "id": "prepare-analysis",
+      "name": "Prepare for Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "08 - Document Analyzer OpenAI"
+        },
+        "options": {}
+      },
+      "id": "analyze-doc",
+      "name": "Analyze Document",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [2640, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "analyzed_documents",
+        "options": {}
+      },
+      "id": "aggregate-analyzed",
+      "name": "Aggregate Analyzed",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2860, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route to document generators based on analysis\nconst item = $input.first();\nconst analyzedDocs = item.json.analyzed_documents || [];\nconst context = item.json;\n\n// Prepare generation requests for each document type\nconst generationRequests = [\n  {\n    generator: '12 - Corporate Overview Generator',\n    document_type: 'corporate_overview',\n    analyzed_documents: analyzedDocs,\n    company_snippet: context.company_snippet,\n    enrichment_data: context.enrichment_data\n  },\n  {\n    generator: '13 - Product Datasheet Generator',\n    document_type: 'product_datasheet',\n    product_name: 'AIRR',\n    analyzed_documents: analyzedDocs,\n    company_snippet: context.company_snippet,\n    enrichment_data: context.enrichment_data\n  },\n  {\n    generator: '14 - Higher Ed One-Pager Generator',\n    document_type: 'higher_ed_onepager',\n    analyzed_documents: analyzedDocs,\n    company_snippet: context.company_snippet,\n    enrichment_data: context.enrichment_data\n  }\n];\n\nreturn generationRequests.map(req => ({ json: req }));"
+      },
+      "id": "route-generators",
+      "name": "Route to Generators",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3080, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.generator }}"
+        },
+        "options": {}
+      },
+      "id": "generate-doc",
+      "name": "Generate Document",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [3300, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "16 - Visual Asset Generator"
+        },
+        "options": {}
+      },
+      "id": "generate-visuals",
+      "name": "Generate Visuals",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [3520, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "18 - Google Drive Uploader"
+        },
+        "options": {}
+      },
+      "id": "upload-doc",
+      "name": "Upload to Drive",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [3740, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "uploaded_documents",
+        "options": {}
+      },
+      "id": "aggregate-uploads",
+      "name": "Aggregate Uploads",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [3960, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate execution summary\nconst item = $input.first();\nconst uploads = item.json.uploaded_documents || [];\n\nconst successful = uploads.filter(u => u.status === 'uploaded');\nconst failed = uploads.filter(u => u.status !== 'uploaded');\n\nconst summary = {\n  execution_id: $execution.id,\n  status: failed.length === 0 ? 'completed' : 'completed_with_errors',\n  documents_generated: uploads.length,\n  successful_uploads: successful.length,\n  failed_uploads: failed.length,\n  uploaded_files: successful.map(u => ({\n    file_name: u.file_name,\n    file_id: u.file_id,\n    web_link: u.web_link\n  })),\n  errors: failed.map(f => f.error || 'Unknown error'),\n  completed_at: new Date().toISOString()\n};\n\nreturn [{ json: summary }];"
+      },
+      "id": "generate-summary",
+      "name": "Generate Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4180, 100]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.GOOGLE_CHAT_WEBHOOK_URL || 'CONFIGURE_WEBHOOK' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"✅ *Document Regeneration Complete*\\n\\n📊 Generated: {{ $json.documents_generated }} documents\\n✅ Uploaded: {{ $json.successful_uploads }}\\n❌ Failed: {{ $json.failed_uploads }}\\n\\n🔗 Files: {{ $json.uploaded_files.map(f => f.file_name).join(', ') }}\\n\\n⏱️ Completed: {{ $json.completed_at }}\"\n}",
+        "options": {}
+      },
+      "id": "notify-completion",
+      "name": "Notify Completion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4400, 100],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Triggers": {
+      "main": [
+        [
+          {
+            "node": "Initialize Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Variables": {
+      "main": [
+        [
+          {
+            "node": "Fetch Company Snippet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Enrichment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Company Snippet": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Enrichment Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Context": {
+      "main": [
+        [
+          {
+            "node": "Combine Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Context": {
+      "main": [
+        [
+          {
+            "node": "Scan Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Prepare Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Documents": {
+      "main": [
+        [
+          {
+            "node": "Batch Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Documents": {
+      "main": [
+        [
+          {
+            "node": "Fetch Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Document": {
+      "main": [
+        [
+          {
+            "node": "Process Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Batch": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Analysis": {
+      "main": [
+        [
+          {
+            "node": "Analyze Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Document": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Analyzed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Analyzed": {
+      "main": [
+        [
+          {
+            "node": "Route to Generators",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Generators": {
+      "main": [
+        [
+          {
+            "node": "Generate Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Document": {
+      "main": [
+        [
+          {
+            "node": "Generate Visuals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Visuals": {
+      "main": [
+        [
+          {
+            "node": "Upload to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Drive": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Uploads": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Notify Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "19 - Error Orchestrator"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "main"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

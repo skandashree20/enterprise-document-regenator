@@ -1,0 +1,41 @@
+{
+  "client_name": "Massachusetts Institute of Technology",
+  "short_name": "MIT",
+  "branding": {
+    "primary_color": "#750014",
+    "secondary_color": "#8B959E",
+    "logo_url": "https://brand.mit.edu/images/mit-logo.png"
+  },
+  "document_types": [
+    "technical-datasheet",
+    "integration-guide",
+    "api-documentation",
+    "security-whitepaper"
+  ],
+  "custom_context": "MIT is a world-renowned research institution known for technical excellence and innovation. They require enterprise-grade solutions with robust API capabilities, high security standards, and seamless integration with their custom-built systems. MIT values detailed technical documentation and proof of security compliance.",
+  "contacts": {
+    "primary": {
+      "name": "TBD",
+      "email": "registrar@mit.edu",
+      "title": "University Registrar"
+    }
+  },
+  "engagement_history": {
+    "first_contact": "2024-01-01",
+    "status": "prospect",
+    "notes": "Exploring advanced transcript processing capabilities"
+  },
+  "technical_context": {
+    "sis": "Custom/SAP",
+    "lms": "Canvas + Custom",
+    "integrations": ["REST API", "GraphQL", "OAuth 2.0"],
+    "scale": "11,000+ students",
+    "special_requirements": ["Custom API endpoints", "Advanced security", "Self-hosted option"]
+  },
+  "focus_areas": [
+    "API-first architecture",
+    "Security and compliance (FERPA, SOC 2)",
+    "Graduate program support",
+    "Research credential management"
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "name": "09 - Document Analyzer Gemini",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare document content for analysis\nconst item = $input.first();\nconst extractedText = item.json.extracted_text || '';\nconst fileInfo = item.json;\n\nif (!extractedText || extractedText.length < 50) {\n  return [{\n    json: {\n      ...fileInfo,\n      status: 'skipped',\n      skip_reason: 'Insufficient text content for analysis (less than 50 characters)'\n    }\n  }];\n}\n\n// Gemini has larger context window, but still limit for efficiency\nconst maxChars = 500000; // Gemini can handle ~1M tokens\nconst truncatedText = extractedText.length > maxChars \n  ? extractedText.substring(0, maxChars) + '\\n\\n[Content truncated due to length...]'\n  : extractedText;\n\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    mime_type: fileInfo.mime_type,\n    extension: fileInfo.extension,\n    extracted_text: truncatedText,\n    original_length: extractedText.length,\n    was_truncated: extractedText.length > maxChars,\n    analysis_started: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-analysis",
+      "name": "Prepare for Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-skip",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "skipped",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-skip",
+      "name": "Check if Skipped",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "modelId": "gemini-1.5-pro",
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "You are a document analyst for OneOrigin, an EdTech company specializing in AIRR (transcript processing) and higher education services in the US.\n\nAnalyze the following document and extract information in this JSON format:\n\n{\n  \"summary\": \"2-3 sentence summary of the document\",\n  \"document_type\": \"one of: sales, technical, proposal, marketing, internal, legal, other\",\n  \"themes\": [\"array of main themes/topics\"],\n  \"entities\": {\n    \"products\": [\"product names mentioned\"],\n    \"clients\": [\"client/university names mentioned\"],\n    \"technologies\": [\"technologies mentioned\"]\n  },\n  \"edtech_relevance\": {\n    \"higher_ed_context\": \"description of higher ed relevance\",\n    \"compliance_mentions\": [\"FERPA, accreditation, etc.\"],\n    \"transcript_processing\": \"any transcript-related content\"\n  },\n  \"key_points\": [\"array of important points/facts\"],\n  \"quotes\": [\"notable quotes or statements\"],\n  \"recommended_output\": {\n    \"corporate_overview\": 0.0 to 1.0,\n    \"product_datasheet\": 0.0 to 1.0,\n    \"higher_ed_onepager\": 0.0 to 1.0,\n    \"client_document\": 0.0 to 1.0\n  },\n  \"confidence\": 0.0 to 1.0\n}\n\nRespond ONLY with valid JSON, no additional text.\n\nDocument to analyze:\n---\nFile: {{ $json.file_name }}\n\n{{ $json.extracted_text }}\n---"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3,
+          "maxOutputTokens": 4000
+        }
+      },
+      "id": "gemini-analyze",
+      "name": "Gemini - Analyze Document",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [660, -100],
+      "credentials": {
+        "googleGeminiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Gemini API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini response and structure output\nconst item = $input.first();\nconst fileInfo = item.json;\nlet analysis = null;\n\ntry {\n  // Parse the response (might be string or object)\n  let response = item.json.message?.content || item.json.text || item.json.output || '';\n  \n  // Gemini sometimes wraps JSON in markdown code blocks\n  if (typeof response === 'string') {\n    // Remove markdown code blocks if present\n    response = response.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n    analysis = JSON.parse(response);\n  } else {\n    analysis = response;\n  }\n} catch (e) {\n  return [{\n    json: {\n      file_id: fileInfo.file_id,\n      file_name: fileInfo.file_name,\n      status: 'error',\n      error_message: 'Failed to parse Gemini response: ' + e.message,\n      raw_response: item.json\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    mime_type: fileInfo.mime_type,\n    extension: fileInfo.extension,\n    analysis: analysis,\n    analyzer: 'gemini-1.5-pro',\n    status: 'analyzed',\n    analysis_completed: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "parse-response",
+      "name": "Parse Analysis Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {},
+      "id": "merge-output",
+      "name": "Merge Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Analysis": {
+      "main": [
+        [
+          {
+            "node": "Check if Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Skipped": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Analyze Document",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Gemini - Analyze Document": {
+      "main": [
+        [
+          {
+            "node": "Parse Analysis Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Analysis Response": {
+      "main": [
+        [
+          {
+            "node": "Merge Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "analysis"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,203 @@
+{
+  "name": "03 - Document Fetcher",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract file info from input\nconst fileId = $input.first().json.file_id;\nconst fileName = $input.first().json.file_name;\nconst mimeType = $input.first().json.mime_type;\nconst extension = $input.first().json.extension;\n\nif (!fileId) {\n  throw new Error('No file_id provided');\n}\n\nreturn [{\n  json: {\n    file_id: fileId,\n    file_name: fileName,\n    mime_type: mimeType,\n    extension: extension,\n    fetch_started: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-fetch",
+      "name": "Prepare Fetch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.file_id }}"
+        },
+        "options": {}
+      },
+      "id": "gdrive-download",
+      "name": "Google Drive - Download",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 0],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Drive OAuth2"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-error",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-error",
+      "name": "Check for Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "error_message",
+              "value": "={{ $json.error.message || 'Failed to download file' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-error",
+      "name": "Set Error Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process downloaded binary content\nconst item = $input.first();\nconst binaryData = item.binary?.data;\nconst fileInfo = item.json;\n\nif (!binaryData) {\n  return [{\n    json: {\n      ...fileInfo,\n      status: 'error',\n      error_message: 'No binary data received'\n    }\n  }];\n}\n\n// Get file content as base64 for further processing\n// Note: Text extraction happens in processor workflows\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    mime_type: fileInfo.mime_type || binaryData.mimeType,\n    extension: fileInfo.extension,\n    file_size: binaryData.fileSize,\n    status: 'downloaded',\n    fetch_completed: new Date().toISOString()\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "process-download",
+      "name": "Process Download",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {},
+      "id": "merge-output",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Fetch": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Download": {
+      "main": [
+        [
+          {
+            "node": "Check for Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Error": {
+      "main": [
+        [
+          {
+            "node": "Set Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Error Output": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Download": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "ingestion"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

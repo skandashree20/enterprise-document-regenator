@@ -1,0 +1,289 @@
+{
+  "name": "10 - External Data Enricher",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "edtech_query",
+              "value": "EdTech trends higher education 2024 2025 digital transformation"
+            },
+            {
+              "name": "ferpa_query",
+              "value": "FERPA compliance updates student data privacy regulations"
+            },
+            {
+              "name": "higher_ed_query",
+              "value": "higher education technology trends accreditation automation"
+            },
+            {
+              "name": "transcript_query",
+              "value": "academic transcript processing automation digital credentials"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-queries",
+      "name": "Set Search Queries",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://google.serper.dev/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"{{ $json.edtech_query }}\",\n  \"num\": 10\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "serper-edtech",
+      "name": "Serper - EdTech News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, -200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Serper API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://google.serper.dev/news",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"{{ $json.ferpa_query }}\",\n  \"num\": 10\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "serper-ferpa",
+      "name": "Serper - FERPA Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, -50],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Serper API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.search.brave.com/res/v1/web/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.higher_ed_query }}"
+            },
+            {
+              "name": "count",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "brave-higher-ed",
+      "name": "Brave - Higher Ed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Brave Search API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.tavily.com/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"{{ $json.transcript_query }}\",\n  \"max_results\": 10,\n  \"search_depth\": \"advanced\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "tavily-transcript",
+      "name": "Tavily - Transcript Tech",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 250],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Tavily API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-results",
+      "name": "Merge All Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine and structure all search results\nconst items = $input.all();\n\nconst enrichmentData = {\n  edtech_news: [],\n  ferpa_updates: [],\n  higher_ed_trends: [],\n  transcript_tech: [],\n  fetch_timestamp: new Date().toISOString(),\n  sources_queried: 0,\n  total_results: 0\n};\n\n// Process each response\nfor (const item of items) {\n  const data = item.json.body || item.json;\n  \n  // Serper EdTech results\n  if (data.organic && item.json.query?.includes('EdTech')) {\n    enrichmentData.edtech_news = (data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet,\n      link: r.link,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Serper FERPA/News results\n  if (data.news || (data.organic && item.json.query?.includes('FERPA'))) {\n    enrichmentData.ferpa_updates = (data.news || data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet || r.description,\n      link: r.link,\n      date: r.date,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Brave results\n  if (data.web?.results) {\n    enrichmentData.higher_ed_trends = data.web.results.slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.description,\n      link: r.url,\n      source: 'brave'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Tavily results\n  if (data.results) {\n    enrichmentData.transcript_tech = data.results.slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.content,\n      link: r.url,\n      score: r.score,\n      source: 'tavily'\n    }));\n    enrichmentData.sources_queried++;\n  }\n}\n\n// Calculate totals\nenrichmentData.total_results = \n  enrichmentData.edtech_news.length +\n  enrichmentData.ferpa_updates.length +\n  enrichmentData.higher_ed_trends.length +\n  enrichmentData.transcript_tech.length;\n\nreturn [{ json: enrichmentData }];"
+      },
+      "id": "structure-results",
+      "name": "Structure Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Search Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Search Queries": {
+      "main": [
+        [
+          {
+            "node": "Serper - EdTech News",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Serper - FERPA Updates",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Brave - Higher Ed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tavily - Transcript Tech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serper - EdTech News": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serper - FERPA Updates": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Brave - Higher Ed": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Tavily - Transcript Tech": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Merge All Results": {
+      "main": [
+        [
+          {
+            "node": "Structure Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "enrichment"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

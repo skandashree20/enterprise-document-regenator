@@ -1,0 +1,41 @@
+{
+  "client_name": "Arizona State University",
+  "short_name": "ASU",
+  "branding": {
+    "primary_color": "#8C1D40",
+    "secondary_color": "#FFC627",
+    "logo_url": "https://brandguide.asu.edu/images/asu-logo.png"
+  },
+  "document_types": [
+    "proposal",
+    "one-pager",
+    "integration-guide",
+    "compliance-report"
+  ],
+  "custom_context": "Arizona State University is a large public research university with over 100,000 students across multiple campuses. They are known for innovation in online education and digital transformation. ASU prioritizes scalable solutions that can handle high volume transcript processing and seamless integration with their existing EdTech ecosystem.",
+  "contacts": {
+    "primary": {
+      "name": "TBD",
+      "email": "registrar@asu.edu",
+      "title": "University Registrar"
+    }
+  },
+  "engagement_history": {
+    "first_contact": "2024-01-01",
+    "status": "prospect",
+    "notes": "Initial outreach for transcript automation solutions"
+  },
+  "technical_context": {
+    "sis": "PeopleSoft",
+    "lms": "Canvas",
+    "integrations": ["API", "SFTP", "Real-time webhooks"],
+    "scale": "100,000+ students",
+    "special_requirements": ["Multi-campus support", "Online program integration"]
+  },
+  "focus_areas": [
+    "Transcript automation at scale",
+    "Digital credential management",
+    "FERPA compliance",
+    "Integration with ASU Sync"
+  ]
+}

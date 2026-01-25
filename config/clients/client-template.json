@@ -1,0 +1,32 @@
+{
+  "client_name": "University Name",
+  "short_name": "UNI",
+  "branding": {
+    "primary_color": "#003366",
+    "secondary_color": "#FFD700",
+    "logo_url": "https://example.com/logo.png"
+  },
+  "document_types": [
+    "proposal",
+    "one-pager",
+    "integration-guide"
+  ],
+  "custom_context": "Brief description of the client, their size, focus areas, and specific needs.",
+  "contacts": {
+    "primary": {
+      "name": "Contact Name",
+      "email": "contact@university.edu",
+      "title": "Title"
+    }
+  },
+  "engagement_history": {
+    "first_contact": "2024-01-01",
+    "status": "active",
+    "notes": "Engagement notes and history"
+  },
+  "technical_context": {
+    "sis": "Banner/Colleague/PeopleSoft",
+    "lms": "Canvas/Blackboard/Moodle",
+    "integrations": ["API v2", "SFTP"]
+  }
+}

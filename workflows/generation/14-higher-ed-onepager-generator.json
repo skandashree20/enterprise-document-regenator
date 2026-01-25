@@ -1,0 +1,113 @@
+{
+  "name": "14 - Higher Ed One-Pager Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-node",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for higher ed one-pager generation\nconst item = $input.first().json;\n\nconst context = {\n  analyzed_documents: item.analyzed_documents || [],\n  company_snippet: item.company_snippet || {},\n  enrichment_data: item.enrichment_data || {},\n  generation_type: 'higher_ed_onepager',\n  generation_started: new Date().toISOString()\n};\n\n// Extract higher ed specific information\nconst higherEdInfo = {\n  compliance_mentions: [],\n  client_mentions: [],\n  services: [],\n  challenges_addressed: []\n};\n\nfor (const doc of context.analyzed_documents) {\n  if (doc.analysis) {\n    // Extract compliance mentions\n    const compliance = doc.analysis.edtech_relevance?.compliance_mentions || [];\n    higherEdInfo.compliance_mentions.push(...compliance);\n    \n    // Extract client/university mentions\n    const clients = doc.analysis.entities?.clients || [];\n    higherEdInfo.client_mentions.push(...clients);\n    \n    // Look for higher ed context\n    if (doc.analysis.edtech_relevance?.higher_ed_context) {\n      higherEdInfo.services.push(doc.analysis.edtech_relevance.higher_ed_context);\n    }\n  }\n}\n\ncontext.higher_ed_info = {\n  compliance: [...new Set(higherEdInfo.compliance_mentions)],\n  clients: [...new Set(higherEdInfo.client_mentions)].slice(0, 5),\n  context: higherEdInfo.services.slice(0, 3)\n};\n\nreturn [{ json: context }];"
+      },
+      "id": "prepare-context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a marketing specialist for OneOrigin, creating one-pagers for higher education audiences.\n\nYour task is to generate a compelling One-Pager that:\n- Speaks directly to higher education administrators and decision-makers\n- Addresses common challenges in student records and transcript management\n- Highlights compliance with FERPA, accreditation standards, etc.\n- Provides clear value propositions and outcomes\n- Is scannable in under 2 minutes\n- Includes a clear call-to-action\n\nFormat as a single-page document in Markdown optimized for visual presentation."
+            },
+            {
+              "role": "user",
+              "content": "Generate a Higher Education One-Pager for OneOrigin based on the following:\n\n## COMPANY BACKGROUND\n{{ $json.company_snippet.raw_content }}\n\n## COMPLIANCE & REGULATORY CONTEXT\nMentions: {{ $json.higher_ed_info.compliance.join(', ') || 'FERPA, accreditation, data privacy' }}\n\n## REFERENCED CLIENTS\n{{ $json.higher_ed_info.clients.join(', ') || 'Leading universities and colleges' }}\n\n## CURRENT HIGHER ED TRENDS\n{{ JSON.stringify($json.enrichment_data.higher_ed_trends?.slice(0, 3) || [], null, 2) }}\n\n## FERPA & COMPLIANCE UPDATES\n{{ JSON.stringify($json.enrichment_data.ferpa_updates?.slice(0, 2) || [], null, 2) }}\n\n---\n\nGenerate a ONE-PAGE document with:\n1. Headline (attention-grabbing)\n2. The Challenge (2-3 pain points higher ed faces)\n3. The Solution (OneOrigin's approach)\n4. Key Benefits (3-4 bullet points with metrics if possible)\n5. Compliance Assurance (FERPA, security)\n6. Success Indicators / Social Proof\n7. Call to Action\n\nKeep it concise, impactful, and visually organized. Use emojis sparingly for visual appeal."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 2000
+        }
+      },
+      "id": "openai-generate",
+      "name": "OpenAI - Generate One-Pager",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [440, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process generated content\nconst item = $input.first();\nconst content = item.json.message?.content || item.json.text || item.json.output || '';\nconst context = item.json;\n\nif (!content) {\n  return [{\n    json: {\n      status: 'error',\n      error_message: 'Failed to generate higher ed one-pager',\n      generation_type: 'higher_ed_onepager'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    document_type: 'higher_ed_onepager',\n    title: 'OneOrigin Higher Education Solutions',\n    content: content,\n    format: 'markdown',\n    file_name: `OneOrigin_HigherEd_OnePager_${new Date().toISOString().split('T')[0]}.md`,\n    metadata: {\n      generated_at: new Date().toISOString(),\n      compliance_focus: context.higher_ed_info?.compliance || [],\n      source_documents: context.analyzed_documents?.length || 0\n    },\n    status: 'generated'\n  }\n}];"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate One-Pager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate One-Pager": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
