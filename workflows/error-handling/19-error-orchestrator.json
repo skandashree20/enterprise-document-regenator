@@ -148,19 +148,26 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "i1j2k3l4-1111-2222-3333-444455556666",
               "name": "action",
-              "value": "notify_high_priority"
+              "value": "notify_high_priority",
+              "type": "string"
             },
             {
+              "id": "i1j2k3l4-1111-2222-3333-444455556677",
               "name": "requires_manual_intervention",
-              "value": "true"
+              "value": "true",
+              "type": "string"
             }
           ]
         },
-        "options": {}
+        "options": {},
+        "includeOtherFields": true
       },
       "id": "set-auth-action",
       "name": "Set Auth Action",
@@ -170,15 +177,20 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "j1k2l3m4-1111-2222-3333-444455556666",
               "name": "action",
-              "value": "log_and_notify"
+              "value": "log_and_notify",
+              "type": "string"
             }
           ]
         },
-        "options": {}
+        "options": {},
+        "includeOtherFields": true
       },
       "id": "set-other-action",
       "name": "Set Other Action",

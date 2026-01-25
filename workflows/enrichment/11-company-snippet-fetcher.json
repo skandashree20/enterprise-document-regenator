@@ -11,11 +11,15 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "h1i2j3k4-1111-2222-3333-444455556666",
               "name": "company_doc_id",
-              "value": "CONFIGURE_YOUR_GOOGLE_DOC_ID_HERE"
+              "value": "PASTE_YOUR_GOOGLE_DOC_ID_HERE",
+              "type": "string"
             }
           ]
         },

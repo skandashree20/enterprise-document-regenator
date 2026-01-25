@@ -5,6 +5,7 @@ An AI-powered n8n workflow system that automatically ingests, analyzes, and rege
 ## Overview
 
 This system:
+
 - **Ingests** documents from Google Drive (including ex-employee drives)
 - **Analyzes** content using OpenAI GPT-4 and Google Gemini
 - **Enriches** with external EdTech/Higher Ed news and trends
@@ -17,7 +18,7 @@ This system:
 1. **Corporate Overview** - Company positioning and identity
 2. **Product Datasheets** - For any OneOrigin product (AIRR, etc.)
 3. **Higher Ed One-Pagers** - Quick reference docs for education services
-4. **Client-Specific Documents** - Custom docs for clients (ASU, MIT, etc.)
+4. **Client-Specific Documents** - Custom docs for clients
 5. **Visual Assets** - Slides, infographics, brochures
 
 ## Quick Start
@@ -26,20 +27,27 @@ This system:
 # 1. Clone and configure
 cd docker
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your settings (change port if 5678 is in use)
 
 # 2. Start n8n
 docker compose up -d
 
 # 3. Access n8n UI
-open http://localhost:5678
+open http://localhost:5680  # or your configured port
 
-# 4. Import workflows
-cd ../scripts
-chmod +x import-workflows.sh
-./import-workflows.sh
+# 4. Import all 20 workflows via CLI (recommended)
+cd ..  # back to project root
+for f in workflows/**/*.json; do
+  docker cp "$f" n8n-doc-regenerator:/tmp/workflow.json
+  docker exec n8n-doc-regenerator n8n import:workflow --input=/tmp/workflow.json
+done
 
-# 5. Configure credentials in n8n UI
+# 5. Configure credentials in n8n UI (Settings → Credentials)
+```
+
+**One-liner to import all workflows:**
+```bash
+for f in workflows/**/*.json; do docker cp "$f" n8n-doc-regenerator:/tmp/workflow.json && docker exec n8n-doc-regenerator n8n import:workflow --input=/tmp/workflow.json; done
 ```
 
 ## Documentation
@@ -95,20 +103,20 @@ chmod +x import-workflows.sh
 
 ## Workflows
 
-| # | Workflow | Purpose |
-|---|----------|---------|
-| 01 | Main Orchestrator | Central coordinator |
-| 02 | Google Drive Scanner | Scans source folders |
-| 03 | Document Fetcher | Downloads documents |
-| 04 | Batch Router | Routes by file type |
-| 05-07 | Processors | PDF, DOCX, Generic |
-| 08-09 | Analyzers | OpenAI, Gemini |
-| 10 | External Enricher | Web search for context |
-| 11 | Snippet Fetcher | Company identity |
-| 12-15 | Generators | Document types |
-| 16-17 | Visual Gen | Images and designs |
-| 18 | GDrive Uploader | Saves output |
-| 19-20 | Error Handling | Orchestrator + Notifier |
+| #     | Workflow             | Purpose                 |
+| ----- | -------------------- | ----------------------- |
+| 01    | Main Orchestrator    | Central coordinator     |
+| 02    | Google Drive Scanner | Scans source folders    |
+| 03    | Document Fetcher     | Downloads documents     |
+| 04    | Batch Router         | Routes by file type     |
+| 05-07 | Processors           | PDF, DOCX, Generic      |
+| 08-09 | Analyzers            | OpenAI, Gemini          |
+| 10    | External Enricher    | Web search for context  |
+| 11    | Snippet Fetcher      | Company identity        |
+| 12-15 | Generators           | Document types          |
+| 16-17 | Visual Gen           | Images and designs      |
+| 18    | GDrive Uploader      | Saves output            |
+| 19-20 | Error Handling       | Orchestrator + Notifier |
 
 ## Configuration
 

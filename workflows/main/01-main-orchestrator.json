@@ -41,21 +41,39 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "a1b2c3d4-1111-2222-3333-444455556666",
               "name": "execution_id",
-              "value": "={{ $execution.id }}"
+              "value": "={{ $execution.id }}",
+              "type": "string"
             },
             {
+              "id": "a1b2c3d4-1111-2222-3333-444455556677",
               "name": "start_time",
-              "value": "={{ $now.toISOString() }}"
-            }
-          ],
-          "object": [
+              "value": "={{ $now.toISOString() }}",
+              "type": "string"
+            },
             {
-              "name": "config",
-              "value": "={\n  \"source_folder_ids\": {{ JSON.stringify($json.folder_ids || [$env.GDRIVE_SOURCE_FOLDER_ID || 'CONFIGURE_SOURCE_FOLDER']) }},\n  \"output_folder_id\": \"{{ $json.output_folder_id || $env.GDRIVE_OUTPUT_FOLDER_ID || 'CONFIGURE_OUTPUT_FOLDER' }}\",\n  \"batch_size\": 5,\n  \"document_types\": [\"corporate_overview\", \"product_datasheet\", \"higher_ed_onepager\", \"client_document\"]\n}"
+              "id": "a1b2c3d4-1111-2222-3333-444455556688",
+              "name": "source_folder_ids",
+              "value": "[\"PASTE_YOUR_SOURCE_FOLDER_ID_HERE\"]",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-1111-2222-3333-444455556699",
+              "name": "output_folder_id",
+              "value": "PASTE_YOUR_OUTPUT_FOLDER_ID_HERE",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-1111-2222-3333-4444555566aa",
+              "name": "batch_size",
+              "value": "5",
+              "type": "number"
             }
           ]
         },
@@ -113,7 +131,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Combine all context data\nconst items = $input.all();\n\nlet context = {\n  company_snippet: null,\n  enrichment_data: null,\n  config: null\n};\n\nfor (const item of items) {\n  if (item.json.company_snippet) {\n    context.company_snippet = item.json.company_snippet;\n  }\n  if (item.json.edtech_news || item.json.ferpa_updates) {\n    context.enrichment_data = item.json;\n  }\n  if (item.json.config) {\n    context.config = typeof item.json.config === 'string' \n      ? JSON.parse(item.json.config) \n      : item.json.config;\n  }\n}\n\nreturn [{ json: context }];"
+        "jsCode": "// Combine all context data\nconst items = $input.all();\n\nlet context = {\n  company_snippet: null,\n  enrichment_data: null,\n  config: {\n    source_folder_ids: [],\n    output_folder_id: '',\n    batch_size: 5\n  }\n};\n\nfor (const item of items) {\n  if (item.json.company_snippet) {\n    context.company_snippet = item.json.company_snippet;\n  }\n  if (item.json.edtech_news || item.json.ferpa_updates) {\n    context.enrichment_data = item.json;\n  }\n  // Get config from Initialize Variables\n  if (item.json.source_folder_ids) {\n    try {\n      context.config.source_folder_ids = typeof item.json.source_folder_ids === 'string' \n        ? JSON.parse(item.json.source_folder_ids) \n        : item.json.source_folder_ids;\n    } catch (e) {\n      context.config.source_folder_ids = [item.json.source_folder_ids];\n    }\n  }\n  if (item.json.output_folder_id) {\n    context.config.output_folder_id = item.json.output_folder_id;\n  }\n  if (item.json.batch_size) {\n    context.config.batch_size = parseInt(item.json.batch_size) || 5;\n  }\n}\n\nreturn [{ json: context }];"
       },
       "id": "combine-context",
       "name": "Combine Context",

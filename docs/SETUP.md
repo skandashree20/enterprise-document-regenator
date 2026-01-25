@@ -85,9 +85,61 @@ Login with:
 
 ## Import Workflows
 
-After n8n is running, import the workflows:
+After n8n is running, import the 20 workflows using one of these methods:
 
-### Option 1: Using Import Script
+### Option 1: Docker CLI Import (Recommended)
+
+This is the fastest method - imports all 20 workflows automatically:
+
+```bash
+# Navigate to project root
+cd /path/to/enterprise-document-regenator
+
+# Import all workflows via n8n CLI
+for f in workflows/**/*.json; do
+  echo "Importing: $(basename $f)"
+  docker cp "$f" n8n-doc-regenerator:/tmp/workflow.json
+  docker exec n8n-doc-regenerator n8n import:workflow --input=/tmp/workflow.json
+done
+```
+
+**One-liner version:**
+
+```bash
+for f in workflows/**/*.json; do docker cp "$f" n8n-doc-regenerator:/tmp/workflow.json && docker exec n8n-doc-regenerator n8n import:workflow --input=/tmp/workflow.json; done
+```
+
+**Expected output:**
+```
+Importing: 08-document-analyzer-openai.json
+Successfully imported 1 workflow.
+Importing: 09-document-analyzer-gemini.json
+Successfully imported 1 workflow.
+... (20 workflows total)
+```
+
+### Option 2: n8n API Import
+
+Requires an API key from n8n:
+
+1. Open n8n UI and go to **Settings → API**
+2. Create a new API key
+3. Run:
+
+```bash
+export N8N_API_KEY="your-api-key"
+export N8N_URL="http://localhost:5680"  # or your n8n URL
+
+for f in workflows/**/*.json; do
+  echo "Importing: $(basename $f)"
+  curl -s -X POST "$N8N_URL/api/v1/workflows" \
+    -H "Content-Type: application/json" \
+    -H "X-N8N-API-KEY: $N8N_API_KEY" \
+    -d @"$f"
+done
+```
+
+### Option 3: Using Import Script
 
 ```bash
 cd scripts
@@ -95,15 +147,15 @@ chmod +x import-workflows.sh
 ./import-workflows.sh
 ```
 
-### Option 2: Manual Import
+### Option 4: Manual Import via UI
 
-1. Open n8n UI
+1. Open n8n UI at http://localhost:5680
 2. Go to **Workflows**
 3. Click **Import from File**
 4. Select each workflow JSON from `workflows/` directory
-5. Repeat for all workflow files
+5. Repeat for all 20 workflow files
 
-**Import Order (recommended):**
+**Import Order (if importing manually):**
 1. Error handling workflows (19, 20)
 2. Output workflows (18)
 3. Visual workflows (16, 17)
@@ -113,6 +165,33 @@ chmod +x import-workflows.sh
 7. Processing workflows (05-07)
 8. Ingestion workflows (02-04)
 9. Main orchestrator (01)
+
+### Verify Import
+
+After importing, refresh the n8n UI. You should see 20 workflows:
+
+| # | Workflow Name |
+|---|---------------|
+| 01 | Main Orchestrator |
+| 02 | Google Drive Scanner |
+| 03 | Document Fetcher |
+| 04 | Batch Router |
+| 05 | PDF Processor |
+| 06 | DOCX Processor |
+| 07 | Generic Processor |
+| 08 | Document Analyzer OpenAI |
+| 09 | Document Analyzer Gemini |
+| 10 | External Data Enricher |
+| 11 | Company Snippet Fetcher |
+| 12 | Corporate Overview Generator |
+| 13 | Product Datasheet Generator |
+| 14 | Higher Ed One-Pager Generator |
+| 15 | Client Document Generator |
+| 16 | Visual Asset Generator |
+| 17 | Figma Integration |
+| 18 | Google Drive Uploader |
+| 19 | Error Orchestrator |
+| 20 | Error Notifier |
 
 ---
 

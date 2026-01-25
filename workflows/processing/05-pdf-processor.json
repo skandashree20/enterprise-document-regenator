@@ -72,23 +72,32 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "e1f2g3h4-1111-2222-3333-444455556666",
               "name": "status",
-              "value": "error"
+              "value": "error",
+              "type": "string"
             },
             {
+              "id": "e1f2g3h4-1111-2222-3333-444455556677",
               "name": "error_message",
-              "value": "Failed to extract text from PDF. The file may be image-based or corrupted."
+              "value": "Failed to extract text from PDF. The file may be image-based or corrupted.",
+              "type": "string"
             },
             {
+              "id": "e1f2g3h4-1111-2222-3333-444455556688",
               "name": "extracted_text",
-              "value": ""
+              "value": "",
+              "type": "string"
             }
           ]
         },
-        "options": {}
+        "options": {},
+        "includeOtherFields": true
       },
       "id": "set-error",
       "name": "Set Error",

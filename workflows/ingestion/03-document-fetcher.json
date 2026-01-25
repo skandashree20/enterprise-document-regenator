@@ -74,19 +74,26 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "d1e2f3g4-1111-2222-3333-444455556666",
               "name": "status",
-              "value": "error"
+              "value": "error",
+              "type": "string"
             },
             {
+              "id": "d1e2f3g4-1111-2222-3333-444455556677",
               "name": "error_message",
-              "value": "={{ $json.error.message || 'Failed to download file' }}"
+              "value": "={{ $json.error.message || 'Failed to download file' }}",
+              "type": "string"
             }
           ]
         },
-        "options": {}
+        "options": {},
+        "includeOtherFields": true
       },
       "id": "set-error",
       "name": "Set Error Output",

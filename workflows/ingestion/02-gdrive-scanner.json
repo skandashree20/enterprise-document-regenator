@@ -11,23 +11,27 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "b1c2d3e4-1111-2222-3333-444455556666",
               "name": "supported_types",
-              "value": "pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls"
-            }
-          ],
-          "number": [
+              "value": "pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls",
+              "type": "string"
+            },
             {
+              "id": "b1c2d3e4-1111-2222-3333-444455556677",
               "name": "max_files_per_folder",
-              "value": 1000
-            }
-          ],
-          "boolean": [
+              "value": "1000",
+              "type": "number"
+            },
             {
+              "id": "b1c2d3e4-1111-2222-3333-444455556688",
               "name": "include_shared_drives",
-              "value": true
+              "value": "true",
+              "type": "boolean"
             }
           ]
         },
@@ -101,21 +105,26 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "c1d2e3f4-1111-2222-3333-444455556666",
               "name": "status",
-              "value": "success"
-            }
-          ],
-          "number": [
+              "value": "success",
+              "type": "string"
+            },
             {
+              "id": "c1d2e3f4-1111-2222-3333-444455556677",
               "name": "total_documents",
-              "value": "={{ $json.documents.length }}"
+              "value": "={{ $json.documents.length }}",
+              "type": "number"
             }
           ]
         },
-        "options": {}
+        "options": {},
+        "includeOtherFields": true
       },
       "id": "set-output",
       "name": "Set Output",

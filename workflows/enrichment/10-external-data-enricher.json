@@ -11,23 +11,33 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
+              "id": "g1h2i3j4-1111-2222-3333-444455556666",
               "name": "edtech_query",
-              "value": "EdTech trends higher education 2024 2025 digital transformation"
+              "value": "EdTech trends higher education 2024 2025 digital transformation",
+              "type": "string"
             },
             {
+              "id": "g1h2i3j4-1111-2222-3333-444455556677",
               "name": "ferpa_query",
-              "value": "FERPA compliance updates student data privacy regulations"
+              "value": "FERPA compliance updates student data privacy regulations",
+              "type": "string"
             },
             {
+              "id": "g1h2i3j4-1111-2222-3333-444455556688",
               "name": "higher_ed_query",
-              "value": "higher education technology trends accreditation automation"
+              "value": "higher education technology trends accreditation automation",
+              "type": "string"
             },
             {
+              "id": "g1h2i3j4-1111-2222-3333-444455556699",
               "name": "transcript_query",
-              "value": "academic transcript processing automation digital credentials"
+              "value": "academic transcript processing automation digital credentials",
+              "type": "string"
             }
           ]
         },
