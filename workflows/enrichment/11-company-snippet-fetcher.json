@@ -56,16 +56,16 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
               "id": "check-content",
-              "leftValue": "={{ $json.body?.content }}",
+              "leftValue": "={{ $json.content }}",
               "rightValue": "",
               "operator": {
-                "type": "array",
-                "operation": "notEmpty"
+                "type": "string",
+                "operation": "isNotEmpty"
               }
             }
           ],
@@ -81,7 +81,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extract text content from Google Docs structure\nconst doc = $input.first().json;\nlet textContent = '';\n\n// Google Docs API returns content as an array of structural elements\nif (doc.body?.content) {\n  for (const element of doc.body.content) {\n    if (element.paragraph?.elements) {\n      for (const textElement of element.paragraph.elements) {\n        if (textElement.textRun?.content) {\n          textContent += textElement.textRun.content;\n        }\n      }\n    }\n  }\n}\n\n// Parse the snippet into structured sections\nconst snippet = {\n  raw_content: textContent.trim(),\n  title: doc.title || 'OneOrigin Company Identity',\n  last_updated: doc.revisionId ? new Date().toISOString() : null,\n  sections: {}\n};\n\n// Try to extract sections based on common headings\nconst sectionPatterns = {\n  mission: /mission[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  vision: /vision[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  values: /values[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  about: /about[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  products: /products?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  services: /services?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  differentiators: /differentiators?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  target_market: /target\\s*market[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i\n};\n\nfor (const [section, pattern] of Object.entries(sectionPatterns)) {\n  const match = textContent.match(pattern);\n  if (match) {\n    snippet.sections[section] = match[1].trim();\n  }\n}\n\nreturn [{\n  json: {\n    company_snippet: snippet,\n    status: 'success',\n    fetch_timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Extract text content from Google Docs response\nconst doc = $input.first().json;\nlet textContent = '';\n\n// With simple: true, content is returned directly as a string\nif (typeof doc.content === 'string') {\n  textContent = doc.content;\n} else if (doc.body?.content) {\n  // Fallback for full API response format\n  for (const element of doc.body.content) {\n    if (element.paragraph?.elements) {\n      for (const textElement of element.paragraph.elements) {\n        if (textElement.textRun?.content) {\n          textContent += textElement.textRun.content;\n        }\n      }\n    }\n  }\n}\n\n// Parse the snippet into structured sections\nconst snippet = {\n  raw_content: textContent.trim(),\n  title: doc.title || 'OneOrigin Company Identity',\n  last_updated: new Date().toISOString(),\n  sections: {}\n};\n\n// Try to extract sections based on common headings\nconst sectionPatterns = {\n  mission: /mission[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  vision: /vision[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  values: /values[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  about: /about[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  products: /products?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  services: /services?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  differentiators: /differentiators?[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i,\n  target_market: /target\\s*market[:\\s]*([^\\n]+(?:\\n(?![A-Z][a-z]+:)[^\\n]+)*)/i\n};\n\nfor (const [section, pattern] of Object.entries(sectionPatterns)) {\n  const match = textContent.match(pattern);\n  if (match) {\n    snippet.sections[section] = match[1].trim();\n  }\n}\n\nreturn [{\n  json: {\n    company_snippet: snippet,\n    status: 'success',\n    fetch_timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "extract-content",
       "name": "Extract Content",

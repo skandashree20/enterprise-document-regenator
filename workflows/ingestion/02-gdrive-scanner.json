@@ -11,126 +11,168 @@
     },
     {
       "parameters": {
-        "mode": "manual",
-        "duplicateItem": false,
-        "assignments": {
-          "assignments": [
+        "jsCode": "// Get folder IDs from input\nconst inputData = $input.first().json;\nlet folderIds = inputData.folder_ids || inputData.config?.source_folder_ids || [];\n\nif (typeof folderIds === 'string') {\n  try { folderIds = JSON.parse(folderIds); } catch (e) { folderIds = [folderIds]; }\n}\n\nif (!Array.isArray(folderIds) || folderIds.length === 0) {\n  throw new Error('No folder IDs provided. Input: ' + JSON.stringify(inputData));\n}\n\nconst supportedTypes = inputData.supported_types || 'pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls,json,csv';\n\nreturn [{\n  json: {\n    folder_id: folderIds[0],\n    all_folder_ids: folderIds,\n    supported_types: supportedTypes\n  }\n}];"
+      },
+      "id": "get-folder",
+      "name": "Get Folder ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
             {
-              "id": "b1c2d3e4-1111-2222-3333-444455556666",
-              "name": "supported_types",
-              "value": "pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls",
-              "type": "string"
+              "name": "q",
+              "value": "={{ \"'\" + $json.folder_id + \"' in parents and trashed=false\" }}"
             },
             {
-              "id": "b1c2d3e4-1111-2222-3333-444455556677",
-              "name": "max_files_per_folder",
-              "value": "1000",
-              "type": "number"
+              "name": "fields",
+              "value": "files(id,name,mimeType,modifiedTime,size,webViewLink,owners)"
             },
             {
-              "id": "b1c2d3e4-1111-2222-3333-444455556688",
-              "name": "include_shared_drives",
-              "value": "true",
-              "type": "boolean"
+              "name": "pageSize",
+              "value": "1000"
             }
           ]
         },
         "options": {}
       },
-      "id": "set-params",
-      "name": "Set Scan Parameters",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [220, 0]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Get folder IDs from input or use defaults\nconst folderIds = $input.first().json.folder_ids || [];\n\nif (folderIds.length === 0) {\n  throw new Error('No folder IDs provided. Please configure source_folder_ids in the orchestrator.');\n}\n\n// Output each folder ID as separate item for processing\nreturn folderIds.map(folderId => ({\n  json: {\n    folder_id: folderId,\n    supported_types: $input.first().json.supported_types,\n    max_files_per_folder: $input.first().json.max_files_per_folder,\n    include_shared_drives: $input.first().json.include_shared_drives\n  }\n}));"
-      },
-      "id": "split-folders",
-      "name": "Split Folder IDs",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [440, 0]
-    },
-    {
-      "parameters": {
-        "operation": "list",
-        "folderId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $json.folder_id }}"
-        },
-        "options": {
-          "fields": ["id", "name", "mimeType", "modifiedTime", "size", "owners", "webViewLink"],
-          "filter": "mimeType != 'application/vnd.google-apps.folder'",
-          "spaces": "={{ $json.include_shared_drives ? 'drive' : 'drive' }}"
-        }
-      },
-      "id": "gdrive-list",
-      "name": "Google Drive - List Files",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [660, 0],
+      "id": "list-root",
+      "name": "List Root Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "CONFIGURE_ME",
-          "name": "Google Drive OAuth2"
+          "id": "8XqNPH9DqLW26kW4",
+          "name": "Google Drive account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Filter files by supported extensions\nconst supportedTypes = ($input.first().json.supported_types || 'pdf,docx,doc,pptx,ppt,txt,md').split(',');\nconst items = $input.all();\nconst filteredItems = [];\n\nfor (const item of items) {\n  const fileName = item.json.name || '';\n  const extension = fileName.split('.').pop()?.toLowerCase() || '';\n  \n  // Check if file extension is supported\n  if (supportedTypes.includes(extension)) {\n    filteredItems.push({\n      json: {\n        file_id: item.json.id,\n        file_name: item.json.name,\n        mime_type: item.json.mimeType,\n        extension: extension,\n        modified_time: item.json.modifiedTime,\n        size: item.json.size,\n        owners: item.json.owners,\n        web_link: item.json.webViewLink,\n        source_folder_id: item.json.folder_id\n      }\n    });\n  }\n}\n\n// Add scan metadata\nif (filteredItems.length > 0) {\n  filteredItems[0].json.scan_metadata = {\n    total_files_found: filteredItems.length,\n    scan_timestamp: new Date().toISOString(),\n    supported_types: supportedTypes\n  };\n}\n\nreturn filteredItems;"
+        "jsCode": "// Get config from Get Folder ID node (using $() reference)\nconst folderConfig = $('Get Folder ID').first().json;\nconst result = $input.first().json;\nconst items = result.files || [];\n\nconst folders = items.filter(f => f.mimeType === 'application/vnd.google-apps.folder');\nconst files = items.filter(f => f.mimeType !== 'application/vnd.google-apps.folder');\n\n// ALWAYS output at least one item to continue the flow\nconst outputs = [];\n\nif (folders.length === 0) {\n  // No subfolders - output marker item with root files\n  outputs.push({\n    json: {\n      has_subfolders: false,\n      subfolder_id: null,\n      root_folder_id: folderConfig.folder_id,\n      supported_types: folderConfig.supported_types,\n      root_files: files,\n      root_files_count: files.length,\n      debug_root_file_names: files.map(f => f.name)\n    }\n  });\n} else {\n  // Has subfolders - output one item per subfolder\n  // Include root_files in FIRST item only\n  for (let i = 0; i < folders.length; i++) {\n    outputs.push({\n      json: {\n        has_subfolders: true,\n        subfolder_id: folders[i].id,\n        subfolder_name: folders[i].name,\n        root_folder_id: folderConfig.folder_id,\n        supported_types: folderConfig.supported_types,\n        root_files: i === 0 ? files : [],\n        root_files_count: i === 0 ? files.length : 0,\n        subfolder_index: i,\n        total_subfolders: folders.length,\n        debug_root_file_names: i === 0 ? files.map(f => f.name) : []\n      }\n    });\n  }\n}\n\nreturn outputs;"
       },
-      "id": "filter-files",
-      "name": "Filter by Extension",
+      "id": "process-root",
+      "name": "Process Root Results",
       "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "check-has-subfolders",
+              "leftValue": "={{ $json.has_subfolders }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-subfolders",
+      "name": "Has Subfolders?",
+      "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [880, 0]
     },
     {
       "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "destinationFieldName": "documents",
-        "include": "allFieldsExcept",
-        "fieldsToExclude": "scan_metadata",
-        "options": {}
-      },
-      "id": "aggregate-docs",
-      "name": "Aggregate Documents",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
-      "position": [1100, 0]
-    },
-    {
-      "parameters": {
-        "mode": "manual",
-        "duplicateItem": false,
-        "assignments": {
-          "assignments": [
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
             {
-              "id": "c1d2e3f4-1111-2222-3333-444455556666",
-              "name": "status",
-              "value": "success",
-              "type": "string"
+              "name": "q",
+              "value": "={{ \"'\" + $json.subfolder_id + \"' in parents and trashed=false\" }}"
             },
             {
-              "id": "c1d2e3f4-1111-2222-3333-444455556677",
-              "name": "total_documents",
-              "value": "={{ $json.documents.length }}",
-              "type": "number"
+              "name": "fields",
+              "value": "files(id,name,mimeType,modifiedTime,size,webViewLink,owners)"
+            },
+            {
+              "name": "pageSize",
+              "value": "1000"
             }
           ]
         },
-        "options": {},
-        "includeOtherFields": true
+        "options": {}
       },
-      "id": "set-output",
-      "name": "Set Output",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [1320, 0]
+      "id": "list-subfolder",
+      "name": "List Subfolder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, -100],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8XqNPH9DqLW26kW4",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get subfolder files from HTTP response\nconst response = $input.first().json;\nconst subfolderFiles = (response.files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder');\n\n// Use $() to reference Process Root Results and get context\n// $itemIndex tells us which item we're processing\nconst processedItems = $('Process Root Results').all();\nconst currentIndex = $runIndex; // Index of current item in the batch\nconst contextItem = processedItems[currentIndex]?.json || processedItems[0]?.json || {};\n\nreturn [{\n  json: {\n    subfolder_files: subfolderFiles,\n    subfolder_files_count: subfolderFiles.length,\n    subfolder_name: contextItem.subfolder_name,\n    root_files: contextItem.root_files || [],\n    root_files_count: contextItem.root_files_count || 0,\n    supported_types: contextItem.supported_types,\n    source: 'subfolder_branch',\n    debug_subfolder_file_names: subfolderFiles.map(f => f.name)\n  }\n}];"
+      },
+      "id": "extract-subfolder-files",
+      "name": "Extract Subfolder Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No subfolders - format root files for output\nconst item = $input.first().json;\n\nreturn [{\n  json: {\n    subfolder_files: [],\n    subfolder_files_count: 0,\n    root_files: item.root_files || [],\n    root_files_count: item.root_files_count || 0,\n    supported_types: item.supported_types,\n    source: 'root_only_branch',\n    debug_root_file_names: item.debug_root_file_names || []\n  }\n}];"
+      },
+      "id": "format-root-only",
+      "name": "Format Root Files Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "all_results",
+        "options": {}
+      },
+      "id": "aggregate-all",
+      "name": "Aggregate All Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final combination of all files from all sources\nconst input = $input.first().json;\nconst allResults = input.all_results || [];\n\n// Determine supported types\nlet supportedTypes = ['pdf','docx','doc','pptx','ppt','txt','md','xlsx','xls','json','csv'];\nif (allResults[0]?.supported_types) {\n  supportedTypes = allResults[0].supported_types.split(',').map(t => t.trim());\n}\n\nlet allRootFiles = [];\nlet allSubfolderFiles = [];\nlet debugInfo = {\n  sources: [],\n  root_file_names: [],\n  subfolder_file_names: []\n};\n\nfor (const result of allResults) {\n  debugInfo.sources.push(result.source);\n  \n  // Collect root files (only once, from first item that has them)\n  if (result.root_files && result.root_files.length > 0 && allRootFiles.length === 0) {\n    allRootFiles = result.root_files;\n    debugInfo.root_file_names = result.debug_root_file_names || result.root_files.map(f => f.name);\n  }\n  \n  // Collect all subfolder files\n  if (result.subfolder_files && result.subfolder_files.length > 0) {\n    allSubfolderFiles = allSubfolderFiles.concat(result.subfolder_files);\n    debugInfo.subfolder_file_names = debugInfo.subfolder_file_names.concat(\n      result.debug_subfolder_file_names || result.subfolder_files.map(f => f.name)\n    );\n  }\n}\n\n// Combine all files\nconst allFiles = [...allRootFiles, ...allSubfolderFiles];\n\n// Filter by supported extensions\nconst filteredFiles = allFiles.filter(file => {\n  const ext = (file.name || '').split('.').pop()?.toLowerCase() || '';\n  return supportedTypes.includes(ext);\n}).map(file => ({\n  file_id: file.id,\n  file_name: file.name,\n  mime_type: file.mimeType,\n  extension: (file.name || '').split('.').pop()?.toLowerCase() || '',\n  modified_time: file.modifiedTime,\n  size: file.size,\n  web_link: file.webViewLink\n}));\n\nreturn [{\n  json: {\n    documents: filteredFiles,\n    status: 'success',\n    total_documents: filteredFiles.length,\n    debug: {\n      root_files_found: allRootFiles.length,\n      subfolder_files_found: allSubfolderFiles.length,\n      total_raw_files: allFiles.length,\n      supported_types: supportedTypes,\n      sources_processed: debugInfo.sources,\n      root_file_names: debugInfo.root_file_names,\n      subfolder_file_names: debugInfo.subfolder_file_names,\n      all_raw_file_names: allFiles.map(f => f.name)\n    }\n  }\n}];"
+      },
+      "id": "final-output",
+      "name": "Combine & Filter Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 0]
     }
   ],
   "connections": {
@@ -138,62 +180,102 @@
       "main": [
         [
           {
-            "node": "Set Scan Parameters",
+            "node": "Get Folder ID",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Set Scan Parameters": {
+    "Get Folder ID": {
       "main": [
         [
           {
-            "node": "Split Folder IDs",
+            "node": "List Root Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split Folder IDs": {
+    "List Root Folder": {
       "main": [
         [
           {
-            "node": "Google Drive - List Files",
+            "node": "Process Root Results",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Google Drive - List Files": {
+    "Process Root Results": {
       "main": [
         [
           {
-            "node": "Filter by Extension",
+            "node": "Has Subfolders?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Filter by Extension": {
+    "Has Subfolders?": {
       "main": [
         [
           {
-            "node": "Aggregate Documents",
+            "node": "List Subfolder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Root Files Only",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Aggregate Documents": {
+    "List Subfolder": {
       "main": [
         [
           {
-            "node": "Set Output",
+            "node": "Extract Subfolder Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Subfolder Files": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Root Files Only": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Results": {
+      "main": [
+        [
+          {
+            "node": "Combine & Filter Output",
             "type": "main",
             "index": 0
           }

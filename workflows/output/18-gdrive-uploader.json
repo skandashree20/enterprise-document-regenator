@@ -1,4 +1,5 @@
 {
+  "id": "sWcRjhQCUTDbZW0h",
   "name": "18 - Google Drive Uploader",
   "nodes": [
     {
@@ -11,7 +12,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare document for upload\nconst item = $input.first().json;\n\nconst uploadRequest = {\n  document_type: item.document_type,\n  title: item.title,\n  content: item.content,\n  file_name: item.file_name || `Document_${new Date().toISOString().split('T')[0]}.md`,\n  format: item.format || 'markdown',\n  metadata: item.metadata || {},\n  visuals: item.visuals || [],\n  output_folder_id: item.output_folder_id || $env.GDRIVE_OUTPUT_FOLDER_ID || 'CONFIGURE_OUTPUT_FOLDER'\n};\n\nreturn [{ json: uploadRequest }];"
+        "jsCode": "// Prepare document for upload\nconst item = $input.first().json;\n\nconst uploadRequest = {\n  document_type: item.document_type,\n  title: item.title,\n  content: item.content,\n  file_name: item.file_name || `Document_${new Date().toISOString().split('T')[0]}.md`,\n  format: item.format || 'markdown',\n  metadata: item.metadata || {},\n  visuals: item.visuals || [],\n  output_folder_id: item.output_folder_id || item.config?.output_folder_id || '1a2b3c4d5e6f'\n};\n\nreturn [{ json: uploadRequest }];"
       },
       "id": "prepare-upload",
       "name": "Prepare Upload",
@@ -49,8 +50,8 @@
       "position": [660, 0],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "CONFIGURE_ME",
-          "name": "Google Drive OAuth2"
+          "id": "8XqNPH9DqLW26kW4",
+          "name": "Google Drive account"
         }
       },
       "continueOnFail": true

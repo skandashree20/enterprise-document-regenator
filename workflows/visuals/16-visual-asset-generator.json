@@ -1,4 +1,5 @@
 {
+  "id": "eNk7PykRD4mFqREB",
   "name": "16 - Visual Asset Generator",
   "nodes": [
     {
@@ -11,10 +12,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare content for visual generation\nconst item = $input.first().json;\n\nconst generatedDoc = {\n  document_type: item.document_type,\n  title: item.title,\n  content: item.content,\n  client_name: item.client_name\n};\n\n// Determine what visuals are needed based on document type\nlet visualRequests = [];\n\nswitch (item.document_type) {\n  case 'corporate_overview':\n    visualRequests = [\n      { type: 'hero_banner', description: 'Corporate hero image with OneOrigin branding' },\n      { type: 'infographic', description: 'Company at a glance infographic' },\n      { type: 'product_diagram', description: 'Product ecosystem diagram' }\n    ];\n    break;\n  case 'product_datasheet':\n    visualRequests = [\n      { type: 'product_screenshot', description: 'Product interface mockup' },\n      { type: 'feature_icons', description: 'Feature icons set' },\n      { type: 'workflow_diagram', description: 'Product workflow diagram' }\n    ];\n    break;\n  case 'higher_ed_onepager':\n    visualRequests = [\n      { type: 'infographic', description: 'Higher ed challenges infographic' },\n      { type: 'stats_visual', description: 'Statistics and metrics visual' }\n    ];\n    break;\n  case 'client_document':\n    visualRequests = [\n      { type: 'custom_banner', description: `Custom banner for ${item.client_name || 'client'}` },\n      { type: 'implementation_timeline', description: 'Implementation timeline visual' }\n    ];\n    break;\n  default:\n    visualRequests = [\n      { type: 'generic_banner', description: 'Generic document header' }\n    ];\n}\n\nreturn [{\n  json: {\n    generated_document: generatedDoc,\n    visual_requests: visualRequests,\n    generation_started: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Prepare content for slide/visual generation - preserve all original data\nconst item = $input.first().json;\n\n// Handle different input structures\nconst docType = item.document_type || 'corporate_overview';\nconst title = item.title || item.generated_content?.title || 'OneOrigin Document';\nconst content = item.content || item.generated_content?.content || JSON.stringify(item);\n\nreturn [{\n  json: {\n    // Preserve original document data for upload\n    original_document: {\n      document_type: docType,\n      title: title,\n      content: typeof content === 'string' ? content : JSON.stringify(content),\n      file_name: item.file_name || `${docType}_${new Date().toISOString().split('T')[0]}.md`,\n      output_folder_id: item.output_folder_id || '',\n      metadata: item.metadata || {}\n    },\n    // Fields for slide generation\n    document_type: docType,\n    title: title,\n    content: typeof content === 'string' ? content : JSON.stringify(content),\n    client_name: item.client_name || null,\n    generation_started: new Date().toISOString()\n  }\n}];"
       },
-      "id": "prepare-visuals",
-      "name": "Prepare Visual Requests",
+      "id": "prepare-content",
+      "name": "Prepare Content",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [220, 0]
@@ -26,28 +27,28 @@
           "values": [
             {
               "role": "system",
-              "content": "You are a visual design strategist. Based on document content, generate detailed prompts for AI image generation.\n\nFor each visual type requested, create a detailed prompt suitable for image generation AI (like DALL-E, Midjourney, or Stable Diffusion).\n\nFocus on:\n- Professional, corporate aesthetics\n- EdTech/Higher Education context\n- Clean, modern design\n- Appropriate color schemes (blues, greens, professional tones)\n- Clear visual hierarchy\n\nRespond with JSON array of image prompts."
+              "content": "You are a presentation designer for OneOrigin, an EdTech company. Create professional slide deck content based on documents.\n\nGenerate a structured slide deck with 5-8 slides. Each slide should have:\n- A clear title\n- 3-5 bullet points (concise, impactful)\n- Speaker notes\n- Visual suggestion (what image/chart would enhance this slide)\n\nStyle guidelines:\n- Professional, clean design\n- EdTech/Higher Education focused\n- Use data and statistics where available\n- Include call-to-action on final slide\n\nRespond ONLY with valid JSON."
             },
             {
               "role": "user",
-              "content": "Generate image prompts for the following document:\n\nDocument Type: {{ $json.generated_document.document_type }}\nTitle: {{ $json.generated_document.title }}\n\nVisual Requests:\n{{ JSON.stringify($json.visual_requests, null, 2) }}\n\nDocument Content Summary:\n{{ $json.generated_document.content.substring(0, 1000) }}...\n\n---\n\nRespond with a JSON array:\n[\n  {\n    \"visual_type\": \"type from request\",\n    \"prompt\": \"detailed image generation prompt\",\n    \"style\": \"professional/modern/minimal\",\n    \"dimensions\": \"16:9 or 1:1 or 4:3\",\n    \"color_palette\": [\"hex colors\"]\n  }\n]"
+              "content": "=Create a presentation slide deck for this document:\n\nDocument Type: {{ $json.document_type }}\nTitle: {{ $json.title }}\n\nContent:\n{{ $json.content.substring(0, 8000) }}\n\n---\n\nRespond with JSON:\n{\n  \"presentation_title\": \"Main title\",\n  \"subtitle\": \"Subtitle or tagline\",\n  \"slides\": [\n    {\n      \"slide_number\": 1,\n      \"slide_type\": \"title|content|stats|comparison|cta\",\n      \"title\": \"Slide title\",\n      \"bullets\": [\"point 1\", \"point 2\"],\n      \"speaker_notes\": \"Notes for presenter\",\n      \"visual_suggestion\": \"Description of recommended visual\"\n    }\n  ],\n  \"color_scheme\": {\n    \"primary\": \"#hex\",\n    \"secondary\": \"#hex\",\n    \"accent\": \"#hex\"\n  },\n  \"recommended_images\": [\n    {\n      \"slide_number\": 1,\n      \"image_prompt\": \"Detailed prompt for image generation\",\n      \"image_type\": \"photo|illustration|diagram|chart\"\n    }\n  ]\n}"
             }
           ]
         },
         "options": {
-          "temperature": 0.7,
-          "maxTokens": 2000,
+          "temperature": 0.5,
+          "maxTokens": 4000,
           "responseFormat": "json_object"
         }
       },
-      "id": "generate-prompts",
-      "name": "Generate Image Prompts",
+      "id": "generate-slides",
+      "name": "Generate Slide Content",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [440, 0],
       "credentials": {
         "openAiApi": {
-          "id": "CONFIGURE_ME",
+          "id": "M1c5KMIVyTRVbsLo",
           "name": "OpenAI API"
         }
       },
@@ -55,51 +56,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse prompts and prepare for image generation\nconst item = $input.first();\nlet imagePrompts = [];\n\ntry {\n  const response = item.json.message?.content || item.json.text || item.json.output || '';\n  const parsed = typeof response === 'string' ? JSON.parse(response) : response;\n  imagePrompts = parsed.prompts || parsed || [];\n} catch (e) {\n  // Create default prompts if parsing fails\n  imagePrompts = [{\n    visual_type: 'banner',\n    prompt: 'Professional corporate banner for EdTech company, modern design, blue and green colors, clean minimal style',\n    style: 'professional',\n    dimensions: '16:9',\n    color_palette: ['#003366', '#00A86B', '#FFFFFF']\n  }];\n}\n\n// Output each prompt as separate item for parallel processing\nreturn imagePrompts.map((prompt, index) => ({\n  json: {\n    ...prompt,\n    index: index,\n    document_type: item.json.generated_document?.document_type,\n    document_title: item.json.generated_document?.title\n  }\n}));"
+        "jsCode": "// Parse slide content and create output structure - preserve original document for upload\nconst item = $input.first();\nconst inputData = $('Prepare Content').first().json;\nconst originalDoc = inputData.original_document || {};\nlet slideContent = null;\n\ntry {\n  const response = item.json.message?.content || item.json.text || item.json.output || '';\n  slideContent = typeof response === 'string' ? JSON.parse(response) : response;\n} catch (e) {\n  // Create default slide structure if parsing fails\n  slideContent = {\n    presentation_title: inputData.title || 'OneOrigin Presentation',\n    subtitle: 'Transforming Higher Education',\n    slides: [\n      {\n        slide_number: 1,\n        slide_type: 'title',\n        title: inputData.title || 'OneOrigin',\n        bullets: ['EdTech Innovation', 'Higher Education Solutions', 'AIRR Technology'],\n        speaker_notes: 'Welcome and introduction',\n        visual_suggestion: 'Company logo with abstract tech background'\n      },\n      {\n        slide_number: 2,\n        slide_type: 'content',\n        title: 'Our Solutions',\n        bullets: ['Transcript Processing', 'Student Services', 'Compliance & Security'],\n        speaker_notes: 'Overview of main service areas',\n        visual_suggestion: 'Service icons or workflow diagram'\n      }\n    ],\n    color_scheme: { primary: '#003366', secondary: '#00A86B', accent: '#FFB800' },\n    recommended_images: []\n  };\n}\n\n// Generate HTML preview of the presentation\nconst slides = slideContent.slides || [];\nlet htmlSlides = `<!DOCTYPE html>\\n<html>\\n<head>\\n  <meta charset=\\\"UTF-8\\\">\\n  <title>${slideContent.presentation_title || 'Presentation'}</title>\\n  <style>\\n    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }\\n    .slide { background: white; margin: 20px auto; padding: 40px; max-width: 900px; min-height: 500px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px; page-break-after: always; }\\n    .slide-title { background: ${slideContent.color_scheme?.primary || '#003366'}; margin: -40px -40px 30px -40px; padding: 30px 40px; }\\n    .slide-title h2 { color: white; margin: 0; font-size: 28px; }\\n    .slide.title-slide { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, ${slideContent.color_scheme?.primary || '#003366'} 0%, ${slideContent.color_scheme?.secondary || '#00A86B'} 100%); color: white; }\\n    .slide.title-slide h1 { font-size: 42px; margin-bottom: 10px; }\\n    .slide.title-slide h3 { font-size: 24px; font-weight: normal; opacity: 0.9; }\\n    ul { font-size: 20px; line-height: 1.8; }\\n    li { margin-bottom: 15px; }\\n    .speaker-notes { background: #fff9e6; border-left: 4px solid ${slideContent.color_scheme?.accent || '#FFB800'}; padding: 15px; margin-top: 30px; font-size: 14px; color: #666; }\\n    .visual-hint { background: #e8f4f8; border-radius: 4px; padding: 10px 15px; margin-top: 20px; font-size: 13px; color: #0066cc; }\\n  </style>\\n</head>\\n<body>\\n`;\n\nhtmlSlides += `<div class=\\\"slide title-slide\\\">\\n  <h1>${slideContent.presentation_title || 'Presentation'}</h1>\\n  <h3>${slideContent.subtitle || ''}</h3>\\n</div>\\n`;\n\nfor (const slide of slides) {\n  if (slide.slide_type === 'title') continue;\n  const bullets = slide.bullets || [];\n  const bulletHTML = bullets.map(b => `<li>${b}</li>`).join('\\n        ');\n  htmlSlides += `<div class=\\\"slide\\\">\\n  <div class=\\\"slide-title\\\"><h2>${slide.title || 'Slide ' + slide.slide_number}</h2></div>\\n  <ul>\\n        ${bulletHTML}\\n      </ul>\\n  ${slide.visual_suggestion ? `<div class=\\\"visual-hint\\\">Visual: ${slide.visual_suggestion}</div>` : ''}\\n  ${slide.speaker_notes ? `<div class=\\\"speaker-notes\\\"><strong>Notes:</strong> ${slide.speaker_notes}</div>` : ''}\\n</div>\\n`;\n}\n\nhtmlSlides += '</body></html>';\n\n// Return original document data + visual data for upload workflow\nreturn [{\n  json: {\n    // Original document fields required by uploader\n    document_type: originalDoc.document_type || inputData.document_type,\n    title: originalDoc.title || inputData.title,\n    content: originalDoc.content || inputData.content,\n    file_name: originalDoc.file_name || `${originalDoc.document_type || 'document'}_${new Date().toISOString().split('T')[0]}.md`,\n    output_folder_id: originalDoc.output_folder_id || '',\n    metadata: originalDoc.metadata || {},\n    // Visual generation results\n    status: 'visuals_generated',\n    visual_count: slides.length,\n    presentation: slideContent,\n    html_preview: htmlSlides,\n    visuals: [{\n      type: 'presentation',\n      format: 'html',\n      title: slideContent.presentation_title,\n      slide_count: slides.length,\n      slides: slideContent.slides\n    }],\n    generation_completed: new Date().toISOString()\n  }\n}];"
       },
-      "id": "parse-prompts",
-      "name": "Parse Image Prompts",
+      "id": "format-output",
+      "name": "Format Presentation Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [660, 0]
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "name",
-          "value": "17 - Figma Integration"
-        },
-        "options": {}
-      },
-      "id": "call-figma",
-      "name": "Generate via Figma/Nano Banana",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [880, 0],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "destinationFieldName": "generated_visuals",
-        "options": {}
-      },
-      "id": "aggregate-visuals",
-      "name": "Aggregate Visuals",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
-      "position": [1100, 0]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Combine generated visuals with document\nconst item = $input.first();\nconst visuals = item.json.generated_visuals || [];\n\nreturn [{\n  json: {\n    status: 'visuals_generated',\n    visual_count: visuals.length,\n    visuals: visuals,\n    generation_completed: new Date().toISOString()\n  }\n}];"
-      },
-      "id": "finalize-output",
-      "name": "Finalize Output",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1320, 0]
     }
   ],
   "connections": {
@@ -107,62 +70,29 @@
       "main": [
         [
           {
-            "node": "Prepare Visual Requests",
+            "node": "Prepare Content",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Visual Requests": {
+    "Prepare Content": {
       "main": [
         [
           {
-            "node": "Generate Image Prompts",
+            "node": "Generate Slide Content",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generate Image Prompts": {
+    "Generate Slide Content": {
       "main": [
         [
           {
-            "node": "Parse Image Prompts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Image Prompts": {
-      "main": [
-        [
-          {
-            "node": "Generate via Figma/Nano Banana",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate via Figma/Nano Banana": {
-      "main": [
-        [
-          {
-            "node": "Aggregate Visuals",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Aggregate Visuals": {
-      "main": [
-        [
-          {
-            "node": "Finalize Output",
+            "node": "Format Presentation Output",
             "type": "main",
             "index": 0
           }
@@ -181,5 +111,5 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "2"
 }

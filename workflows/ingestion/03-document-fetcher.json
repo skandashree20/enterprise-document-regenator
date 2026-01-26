@@ -36,8 +36,8 @@
       "position": [440, 0],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "CONFIGURE_ME",
-          "name": "Google Drive OAuth2"
+          "id": "8XqNPH9DqLW26kW4",
+          "name": "Google Drive account"
         }
       },
       "continueOnFail": true
@@ -103,7 +103,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Process downloaded binary content\nconst item = $input.first();\nconst binaryData = item.binary?.data;\nconst fileInfo = item.json;\n\nif (!binaryData) {\n  return [{\n    json: {\n      ...fileInfo,\n      status: 'error',\n      error_message: 'No binary data received'\n    }\n  }];\n}\n\n// Get file content as base64 for further processing\n// Note: Text extraction happens in processor workflows\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    mime_type: fileInfo.mime_type || binaryData.mimeType,\n    extension: fileInfo.extension,\n    file_size: binaryData.fileSize,\n    status: 'downloaded',\n    fetch_completed: new Date().toISOString()\n  },\n  binary: item.binary\n}];"
+        "jsCode": "// Process downloaded binary content and include base64 in JSON for sub-workflow passing\nconst item = $input.first();\nconst binary = item.binary;\nconst fileInfo = item.json;\n\n// Find the binary key (usually 'data' but could be anything)\nconst binaryKey = binary ? Object.keys(binary)[0] : null;\nconst binaryObj = binaryKey ? binary[binaryKey] : null;\n\nlet debugInfo = {\n  hasBinary: !!binary,\n  binaryKeys: binary ? Object.keys(binary) : [],\n  binaryKey: binaryKey,\n  binaryObjKeys: binaryObj ? Object.keys(binaryObj) : []\n};\n\nif (!binaryObj) {\n  return [{\n    json: {\n      ...fileInfo,\n      status: 'error',\n      error_message: 'No binary data received',\n      debug: debugInfo\n    }\n  }];\n}\n\n// In n8n, binary data can be accessed via helpers or directly\n// Try to get the base64 data using the proper method\nlet base64Data = null;\nlet fileSize = 0;\n\ntry {\n  // Method 1: Use getBinaryDataBuffer helper (recommended for n8n)\n  const binaryBuffer = await this.helpers.getBinaryDataBuffer(0, binaryKey);\n  base64Data = binaryBuffer.toString('base64');\n  fileSize = binaryBuffer.length;\n  debugInfo.method = 'getBinaryDataBuffer';\n  debugInfo.bufferLength = fileSize;\n} catch (e) {\n  debugInfo.helperError = e.message;\n  // Method 2: Try direct access to data property\n  if (binaryObj.data && typeof binaryObj.data === 'string' && binaryObj.data.length > 100) {\n    base64Data = binaryObj.data;\n    fileSize = binaryObj.fileSize || 0;\n    debugInfo.method = 'direct_data';\n  }\n}\n\nif (!base64Data) {\n  return [{\n    json: {\n      ...fileInfo,\n      status: 'error',\n      error_message: 'Could not extract binary data',\n      debug: debugInfo\n    }\n  }];\n}\n\n// Include binary content as base64 IN THE JSON for reliable passing through Execute Workflow\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    mime_type: fileInfo.mime_type || binaryObj.mimeType,\n    extension: fileInfo.extension,\n    file_size: fileSize,\n    status: 'downloaded',\n    fetch_completed: new Date().toISOString(),\n    binary_data: base64Data,\n    binary_mime_type: binaryObj.mimeType,\n    debug: debugInfo\n  },\n  binary: item.binary\n}];"
       },
       "id": "process-download",
       "name": "Process Download",
@@ -112,11 +112,13 @@
       "position": [880, 100]
     },
     {
-      "parameters": {},
-      "id": "merge-output",
-      "name": "Merge",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
+      "parameters": {
+        "jsCode": "// Just pass through the data - this is an end node\nreturn $input.all();"
+      },
+      "id": "output-node",
+      "name": "Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [1100, 0]
     }
   ],
@@ -176,7 +178,7 @@
       "main": [
         [
           {
-            "node": "Merge",
+            "node": "Output",
             "type": "main",
             "index": 0
           }
@@ -187,9 +189,9 @@
       "main": [
         [
           {
-            "node": "Merge",
+            "node": "Output",
             "type": "main",
-            "index": 1
+            "index": 0
           }
         ]
       ]

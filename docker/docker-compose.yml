@@ -67,6 +67,21 @@ services:
       retries: 3
       start_period: 30s
 
+  tika:
+    image: apache/tika:latest
+    container_name: n8n-tika
+    restart: unless-stopped
+    ports:
+      - "9998:9998"
+    networks:
+      - n8n-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9998/tika"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   postgres:
     image: postgres:15-alpine
     container_name: n8n-postgres-new

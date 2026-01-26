@@ -1,4 +1,5 @@
 {
+  "id": "Adlw6GFK6dfNNZ7X",
   "name": "12 - Corporate Overview Generator",
   "nodes": [
     {
@@ -11,7 +12,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare context for corporate overview generation\nconst item = $input.first().json;\n\nconst context = {\n  analyzed_documents: item.analyzed_documents || [],\n  company_snippet: item.company_snippet || {},\n  enrichment_data: item.enrichment_data || {},\n  generation_type: 'corporate_overview',\n  generation_started: new Date().toISOString()\n};\n\n// Extract key themes from analyzed documents\nconst allThemes = [];\nconst allKeyPoints = [];\nconst allQuotes = [];\n\nfor (const doc of context.analyzed_documents) {\n  if (doc.analysis) {\n    allThemes.push(...(doc.analysis.themes || []));\n    allKeyPoints.push(...(doc.analysis.key_points || []));\n    allQuotes.push(...(doc.analysis.quotes || []));\n  }\n}\n\ncontext.aggregated_themes = [...new Set(allThemes)].slice(0, 10);\ncontext.aggregated_key_points = [...new Set(allKeyPoints)].slice(0, 15);\ncontext.aggregated_quotes = [...new Set(allQuotes)].slice(0, 5);\n\nreturn [{ json: context }];"
+        "jsCode": "// Prepare context for corporate overview generation\nconst item = $input.first().json;\n\nconst context = {\n  analyzed_documents: item.analyzed_documents || [],\n  company_snippet: item.company_snippet || {},\n  enrichment_data: item.enrichment_data || {},\n  output_folder_id: item.output_folder_id || '',\n  generation_type: 'corporate_overview',\n  generation_started: new Date().toISOString()\n};\n\n// Extract key themes from analyzed documents\nconst allThemes = [];\nconst allKeyPoints = [];\nconst allQuotes = [];\n\nfor (const doc of context.analyzed_documents) {\n  if (doc.analysis) {\n    allThemes.push(...(doc.analysis.themes || []));\n    allKeyPoints.push(...(doc.analysis.key_points || []));\n    allQuotes.push(...(doc.analysis.quotes || []));\n  }\n}\n\ncontext.aggregated_themes = [...new Set(allThemes)].slice(0, 10);\ncontext.aggregated_key_points = [...new Set(allKeyPoints)].slice(0, 15);\ncontext.aggregated_quotes = [...new Set(allQuotes)].slice(0, 5);\n\nreturn [{ json: context }];"
       },
       "id": "prepare-context",
       "name": "Prepare Context",
@@ -46,7 +47,7 @@
       "position": [440, 0],
       "credentials": {
         "openAiApi": {
-          "id": "CONFIGURE_ME",
+          "id": "M1c5KMIVyTRVbsLo",
           "name": "OpenAI API"
         }
       },
@@ -54,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Process generated content\nconst item = $input.first();\nconst content = item.json.message?.content || item.json.text || item.json.output || '';\nconst context = item.json;\n\nif (!content) {\n  return [{\n    json: {\n      status: 'error',\n      error_message: 'Failed to generate corporate overview',\n      generation_type: 'corporate_overview'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    document_type: 'corporate_overview',\n    title: 'OneOrigin Corporate Overview',\n    content: content,\n    format: 'markdown',\n    file_name: `OneOrigin_Corporate_Overview_${new Date().toISOString().split('T')[0]}.md`,\n    metadata: {\n      generated_at: new Date().toISOString(),\n      source_documents: context.analyzed_documents?.length || 0,\n      themes_used: context.aggregated_themes?.length || 0\n    },\n    status: 'generated'\n  }\n}];"
+        "jsCode": "// Process generated content\nconst item = $input.first();\nconst content = item.json.message?.content || item.json.text || item.json.output || '';\nconst context = item.json;\nconst inputData = $('Prepare Context').first().json;\n\nif (!content) {\n  return [{\n    json: {\n      status: 'error',\n      error_message: 'Failed to generate corporate overview',\n      generation_type: 'corporate_overview'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    document_type: 'corporate_overview',\n    title: 'OneOrigin Corporate Overview',\n    content: content,\n    format: 'markdown',\n    file_name: `OneOrigin_Corporate_Overview_${new Date().toISOString().split('T')[0]}.md`,\n    output_folder_id: inputData.output_folder_id || '',\n    metadata: {\n      generated_at: new Date().toISOString(),\n      source_documents: context.analyzed_documents?.length || 0,\n      themes_used: context.aggregated_themes?.length || 0\n    },\n    status: 'generated'\n  }\n}];"
       },
       "id": "format-output",
       "name": "Format Output",
