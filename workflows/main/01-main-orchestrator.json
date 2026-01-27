@@ -116,7 +116,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "DPlJfIxI2gjWhFgi"
+          "value": "2acc5886-b7f6-47"
         },
         "options": {}
       },
@@ -135,7 +135,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "DJjgypkf0BF6qEhf"
+          "value": "cb2b39eb-a61a-41"
         },
         "options": {}
       },
@@ -183,7 +183,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "GMjX34s2FCKXLkih"
+          "value": "f77af28e-f432-4e"
         },
         "options": {}
       },
@@ -230,7 +230,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "8XqNPH9DqLW26kW4",
+          "id": "22BxZvZno0IrY9iC",
           "name": "Google Drive account"
         }
       },
@@ -297,7 +297,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "zYGKlNsr4QVSqwfk"
+          "value": "98757030-1bfb-4f"
         },
         "options": {
           "mode": "each"
@@ -326,6 +326,106 @@
       "position": [
         2860,
         100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare each analyzed document for update checking\n// Merge analysis results with original extracted text\nconst items = $input.all();\nconst tikaItems = $('Format Tika Response').all();\nconst context = $('Combine Context').first().json;\n\nreturn items.map((item, index) => {\n  const analysis = item.json.analysis || item.json;\n  const tikaData = tikaItems[index]?.json || {};\n  \n  return {\n    json: {\n      file_id: item.json.file_id || tikaData.file_id,\n      file_name: item.json.file_name || tikaData.file_name,\n      extracted_text: tikaData.extracted_text || '',\n      analysis: analysis,\n      output_folder_id: context.config?.output_folder_id || '',\n      config: context.config\n    }\n  };\n});"
+      },
+      "id": "prepare-update",
+      "name": "Prepare for Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DOC_UPDATER_001"
+        },
+        "options": {
+          "mode": "each"
+        }
+      },
+      "id": "update-doc",
+      "name": "Update Document",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3080,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "needs-update",
+              "leftValue": "={{ $json.needs_update }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-updated",
+      "name": "Filter Updated Docs",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "sWcRjhQCUTDbZW0h"
+        },
+        "options": {
+          "mode": "each"
+        }
+      },
+      "id": "upload-updated",
+      "name": "Upload Updated Docs",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3520,
+        250
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log skipped documents (no updates needed)\nconst items = $input.all();\nreturn items.map(item => ({\n  json: {\n    file_name: item.json.file_name,\n    status: 'no_update_needed',\n    reason: item.json.update_summary || 'Document is up to date'\n  }\n}));"
+      },
+      "id": "log-skipped",
+      "name": "Log Skipped Updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        400
       ]
     },
     {
@@ -632,6 +732,51 @@
         [
           {
             "node": "Aggregate Analyzed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare for Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Update": {
+      "main": [
+        [
+          {
+            "node": "Update Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Document": {
+      "main": [
+        [
+          {
+            "node": "Filter Updated Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Updated Docs": {
+      "main": [
+        [
+          {
+            "node": "Upload Updated Docs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Skipped Updates",
             "type": "main",
             "index": 0
           }
