@@ -76,7 +76,7 @@
             {
               "id": "var4",
               "name": "output_folder_id",
-              "value": "PASTE_YOUR_OUTPUT_FOLDER_ID_HERE",
+              "value": "1WftdViMVQYdZ-XLULYjKpP00cLQ3UrBO",
               "type": "string"
             },
             {
@@ -239,7 +239,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "http://host.docker.internal:9998/tika",
+        "url": "http://n8n-tika:9998/tika",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
