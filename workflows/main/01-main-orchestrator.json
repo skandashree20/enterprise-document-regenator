@@ -225,7 +225,7 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1760,
+        1870,
         100
       ],
       "credentials": {
@@ -261,7 +261,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1980,
+        2090,
         100
       ],
       "continueOnFail": true
@@ -275,7 +275,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
+        2310,
         100
       ]
     },
@@ -288,7 +288,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2420,
+        2530,
         100
       ]
     },
@@ -308,36 +308,21 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        2640,
+        2750,
         100
       ],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "destinationFieldName": "analyzed_documents",
-        "options": {}
-      },
-      "id": "aggregate-analyzed",
-      "name": "Aggregate Analyzed",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
-      "position": [
-        2860,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Prepare each analyzed document for update checking\n// Merge analysis results with original extracted text\nconst items = $input.all();\nconst tikaItems = $('Format Tika Response').all();\nconst context = $('Combine Context').first().json;\n\nreturn items.map((item, index) => {\n  const analysis = item.json.analysis || item.json;\n  const tikaData = tikaItems[index]?.json || {};\n  \n  return {\n    json: {\n      file_id: item.json.file_id || tikaData.file_id,\n      file_name: item.json.file_name || tikaData.file_name,\n      extracted_text: tikaData.extracted_text || '',\n      analysis: analysis,\n      output_folder_id: context.config?.output_folder_id || '',\n      config: context.config\n    }\n  };\n});"
+        "jsCode": "// Prepare each analyzed document for update checking\n// Merge analysis results with original extracted text + enrichment context\nconst items = $input.all();\nconst tikaItems = $('Format Tika Response').all();\nconst context = $('Combine Context').first().json;\n\nreturn items.map((item, index) => {\n  const analysis = item.json.analysis || item.json;\n  const tikaData = tikaItems[index]?.json || {};\n  \n  return {\n    json: {\n      file_id: item.json.file_id || tikaData.file_id,\n      file_name: item.json.file_name || tikaData.file_name,\n      extracted_text: tikaData.extracted_text || '',\n      analysis: analysis,\n      output_folder_id: context.config?.output_folder_id || '',\n      config: context.config,\n      // Add enrichment data and company snippet for better update context\n      enrichment_data: context.enrichment_data || {},\n      company_snippet: context.company_snippet || ''\n    }\n  };\n});"
       },
       "id": "prepare-update",
       "name": "Prepare for Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2860,
+        3080,
         300
       ]
     },
@@ -357,7 +342,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        3080,
+        3300,
         300
       ],
       "continueOnFail": true
@@ -390,7 +375,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        3300,
+        3520,
         300
       ]
     },
@@ -410,8 +395,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        3520,
-        250
+        3740,
+        200
       ],
       "continueOnFail": true
     },
@@ -424,7 +409,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3520,
+        3740,
         400
       ]
     },
@@ -437,8 +422,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3080,
-        100
+        3300,
+        -100
       ]
     },
     {
@@ -457,8 +442,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        3300,
-        100
+        3520,
+        -100
       ],
       "continueOnFail": true
     },
@@ -478,8 +463,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        3520,
-        100
+        3740,
+        -100
       ],
       "continueOnFail": true
     },
@@ -499,8 +484,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        3740,
-        100
+        3960,
+        -100
       ],
       "continueOnFail": true
     },
@@ -515,8 +500,8 @@
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
       "position": [
-        3960,
-        100
+        4180,
+        -100
       ]
     },
     {
@@ -528,8 +513,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4180,
-        100
+        4400,
+        -100
       ]
     },
     {
@@ -545,10 +530,63 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4400,
-        100
+        4620,
+        -100
       ],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "batchSize": "={{ $('Initialize Variables').first().json.batch_size || 5 }}",
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1650,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Accumulate analyzed results in static data for later use\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.accumulated_docs) {\n  staticData.accumulated_docs = [];\n}\n\nconst items = $input.all();\nfor (const item of items) {\n  staticData.accumulated_docs.push(item.json);\n}\n\nconsole.log('Batch accumulated. Total docs so far:', staticData.accumulated_docs.length);\n\n// Pass through all items for the update branch - properly formatted\nreturn items.map(item => ({ json: item.json }));"
+      },
+      "id": "accumulate-results",
+      "name": "Accumulate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "merge-branch-end",
+      "name": "Merge Branch End",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retrieve all accumulated results from static data\nconst staticData = $getWorkflowStaticData('global');\nconst allDocs = staticData.accumulated_docs || [];\n\nconsole.log('All batches complete. Total documents:', allDocs.length);\n\n// Clear static data for next run\nstaticData.accumulated_docs = [];\n\n// Return as aggregated result for generation\nreturn [{ json: { analyzed_documents: allDocs } }];"
+      },
+      "id": "retrieve-all-results",
+      "name": "Retrieve All Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        -100
+      ]
     }
   ],
   "connections": {
@@ -676,6 +714,24 @@
       "main": [
         [
           {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Batches": {
+      "main": [
+        [
+          {
+            "node": "Retrieve All Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Download from Drive",
             "type": "main",
             "index": 0
@@ -731,10 +787,16 @@
       "main": [
         [
           {
-            "node": "Aggregate Analyzed",
+            "node": "Accumulate Results",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Accumulate Results": {
+      "main": [
+        [
           {
             "node": "Prepare for Update",
             "type": "main",
@@ -783,7 +845,40 @@
         ]
       ]
     },
-    "Aggregate Analyzed": {
+    "Upload Updated Docs": {
+      "main": [
+        [
+          {
+            "node": "Merge Branch End",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Skipped Updates": {
+      "main": [
+        [
+          {
+            "node": "Merge Branch End",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Branch End": {
+      "main": [
+        [
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve All Results": {
       "main": [
         [
           {
@@ -872,5 +967,5 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "a2ec5004-993c-44de-8acd-16c7e2563003"
 }

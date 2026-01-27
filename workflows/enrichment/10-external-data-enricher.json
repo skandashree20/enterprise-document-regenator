@@ -7,7 +7,10 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -16,27 +19,27 @@
         "assignments": {
           "assignments": [
             {
-              "id": "g1h2i3j4-1111-2222-3333-444455556666",
+              "id": "query-1",
               "name": "edtech_query",
-              "value": "EdTech trends higher education 2024 2025 digital transformation",
+              "value": "EdTech trends higher education 2025 digital transformation learning",
               "type": "string"
             },
             {
-              "id": "g1h2i3j4-1111-2222-3333-444455556677",
+              "id": "query-2",
               "name": "ferpa_query",
-              "value": "FERPA compliance updates student data privacy regulations",
+              "value": "FERPA compliance updates 2025 student data privacy regulations education",
               "type": "string"
             },
             {
-              "id": "g1h2i3j4-1111-2222-3333-444455556688",
+              "id": "query-3",
               "name": "higher_ed_query",
-              "value": "higher education technology trends accreditation automation",
+              "value": "higher education technology trends 2025 accreditation automation universities",
               "type": "string"
             },
             {
-              "id": "g1h2i3j4-1111-2222-3333-444455556699",
-              "name": "transcript_query",
-              "value": "academic transcript processing automation digital credentials",
+              "id": "query-4",
+              "name": "ai_tech_query",
+              "value": "AI artificial intelligence education technology 2025 machine learning EdTech",
               "type": "string"
             }
           ]
@@ -47,32 +50,36 @@
       "name": "Set Search Queries",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://google.serper.dev/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"q\": \"{{ $json.edtech_query }}\",\n  \"num\": 10\n}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true
-            }
-          }
-        }
+        "options": {}
       },
       "id": "serper-edtech",
       "name": "Serper - EdTech News",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, -200],
+      "position": [
+        440,
+        -200
+      ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CONFIGURE_ME",
-          "name": "Serper API"
+          "id": "kK1GI05nBZrYdskn",
+          "name": "Header Auth account"
         }
       },
       "continueOnFail": true
@@ -81,26 +88,27 @@
       "parameters": {
         "method": "POST",
         "url": "https://google.serper.dev/news",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"q\": \"{{ $json.ferpa_query }}\",\n  \"num\": 10\n}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true
-            }
-          }
-        }
+        "options": {}
       },
       "id": "serper-ferpa",
       "name": "Serper - FERPA Updates",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, -50],
+      "position": [
+        440,
+        -50
+      ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CONFIGURE_ME",
-          "name": "Serper API"
+          "id": "kK1GI05nBZrYdskn",
+          "name": "Header Auth account"
         }
       },
       "continueOnFail": true
@@ -109,26 +117,27 @@
       "parameters": {
         "method": "POST",
         "url": "https://google.serper.dev/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"q\": \"{{ $json.higher_ed_query }}\",\n  \"num\": 10\n}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true
-            }
-          }
-        }
+        "options": {}
       },
       "id": "serper-higher-ed",
       "name": "Serper - Higher Ed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 100],
+      "position": [
+        440,
+        100
+      ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CONFIGURE_ME",
-          "name": "Serper API"
+          "id": "kK1GI05nBZrYdskn",
+          "name": "Header Auth account"
         }
       },
       "continueOnFail": true
@@ -136,46 +145,111 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.tavily.com/search",
+        "url": "https://google.serper.dev/news",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"api_key\": \"PASTE_YOUR_TAVILY_API_KEY_HERE\",\n  \"query\": \"{{ $json.transcript_query }}\",\n  \"max_results\": 10,\n  \"search_depth\": \"advanced\"\n}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true
-            }
-          }
-        }
+        "jsonBody": "={\n  \"q\": \"{{ $json.ai_tech_query }}\",\n  \"num\": 10\n}",
+        "options": {}
       },
-      "id": "tavily-transcript",
-      "name": "Tavily - Transcript Tech",
+      "id": "serper-ai-tech",
+      "name": "Serper - AI Tech News",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 250],
+      "position": [
+        440,
+        250
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kK1GI05nBZrYdskn",
+          "name": "Header Auth account"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combineBy": "combineAll",
+        "jsCode": "const data = $input.first().json;\nreturn [{ json: { ...data, _source: 'edtech' } }];"
+      },
+      "id": "tag-edtech",
+      "name": "Tag EdTech",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nreturn [{ json: { ...data, _source: 'ferpa' } }];"
+      },
+      "id": "tag-ferpa",
+      "name": "Tag FERPA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        -50
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nreturn [{ json: { ...data, _source: 'higher_ed' } }];"
+      },
+      "id": "tag-higher-ed",
+      "name": "Tag Higher Ed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nreturn [{ json: { ...data, _source: 'ai_tech' } }];"
+      },
+      "id": "tag-ai-tech",
+      "name": "Tag AI Tech",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 4,
         "options": {}
       },
       "id": "merge-results",
       "name": "Merge All Results",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [660, 0]
+      "position": [
+        720,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Combine and structure all search results\nconst items = $input.all();\n\nconst enrichmentData = {\n  edtech_news: [],\n  ferpa_updates: [],\n  higher_ed_trends: [],\n  transcript_tech: [],\n  fetch_timestamp: new Date().toISOString(),\n  sources_queried: 0,\n  total_results: 0\n};\n\n// Process each response based on index\nitems.forEach((item, index) => {\n  const data = item.json.body || item.json;\n  \n  // Index 0: Serper EdTech results\n  if (index === 0 && data.organic) {\n    enrichmentData.edtech_news = (data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet,\n      link: r.link,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Index 1: Serper FERPA/News results\n  if (index === 1 && (data.news || data.organic)) {\n    enrichmentData.ferpa_updates = (data.news || data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet || r.description,\n      link: r.link,\n      date: r.date,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Index 2: Serper Higher Ed results\n  if (index === 2 && data.organic) {\n    enrichmentData.higher_ed_trends = (data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet,\n      link: r.link,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Index 3: Tavily results\n  if (index === 3 && data.results) {\n    enrichmentData.transcript_tech = data.results.slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.content,\n      link: r.url,\n      score: r.score,\n      source: 'tavily'\n    }));\n    enrichmentData.sources_queried++;\n  }\n});\n\n// Calculate totals\nenrichmentData.total_results = \n  enrichmentData.edtech_news.length +\n  enrichmentData.ferpa_updates.length +\n  enrichmentData.higher_ed_trends.length +\n  enrichmentData.transcript_tech.length;\n\nreturn [{ json: enrichmentData }];"
+        "jsCode": "// Combine and structure all search results\nconst items = $input.all();\n\nconst enrichmentData = {\n  edtech_news: [],\n  ferpa_updates: [],\n  higher_ed_trends: [],\n  ai_tech_news: [],\n  fetch_timestamp: new Date().toISOString(),\n  sources_queried: 0,\n  total_results: 0\n};\n\n// Process each response by source tag\nitems.forEach((item) => {\n  const data = item.json;\n  const source = data._source;\n  \n  // EdTech results (search)\n  if (source === 'edtech' && data.organic) {\n    enrichmentData.edtech_news = (data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet,\n      link: r.link,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // FERPA/News results\n  if (source === 'ferpa' && (data.news || data.organic)) {\n    enrichmentData.ferpa_updates = (data.news || data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet || r.description,\n      link: r.link,\n      date: r.date,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // Higher Ed results (search)\n  if (source === 'higher_ed' && data.organic) {\n    enrichmentData.higher_ed_trends = (data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet,\n      link: r.link,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n  \n  // AI Tech results (news)\n  if (source === 'ai_tech' && (data.news || data.organic)) {\n    enrichmentData.ai_tech_news = (data.news || data.organic || []).slice(0, 5).map(r => ({\n      title: r.title,\n      snippet: r.snippet || r.description,\n      link: r.link,\n      date: r.date,\n      source: 'serper'\n    }));\n    enrichmentData.sources_queried++;\n  }\n});\n\n// Calculate totals\nenrichmentData.total_results = \n  enrichmentData.edtech_news.length +\n  enrichmentData.ferpa_updates.length +\n  enrichmentData.higher_ed_trends.length +\n  enrichmentData.ai_tech_news.length;\n\nreturn [{ json: enrichmentData }];"
       },
       "id": "structure-results",
       "name": "Structure Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     }
   ],
   "connections": {
@@ -209,20 +283,9 @@
             "index": 0
           },
           {
-            "node": "Tavily - Transcript Tech",
+            "node": "Serper - AI Tech News",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Serper - Higher Ed": {
-      "main": [
-        [
-          {
-            "node": "Merge All Results",
-            "type": "main",
-            "index": 2
           }
         ]
       ]
@@ -231,7 +294,7 @@
       "main": [
         [
           {
-            "node": "Merge All Results",
+            "node": "Tag EdTech",
             "type": "main",
             "index": 0
           }
@@ -242,6 +305,50 @@
       "main": [
         [
           {
+            "node": "Tag FERPA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serper - Higher Ed": {
+      "main": [
+        [
+          {
+            "node": "Tag Higher Ed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serper - AI Tech News": {
+      "main": [
+        [
+          {
+            "node": "Tag AI Tech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag EdTech": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag FERPA": {
+      "main": [
+        [
+          {
             "node": "Merge All Results",
             "type": "main",
             "index": 1
@@ -249,7 +356,18 @@
         ]
       ]
     },
-    "Tavily - Transcript Tech": {
+    "Tag Higher Ed": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Tag AI Tech": {
       "main": [
         [
           {
@@ -283,5 +401,5 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "a4e4c202-5710-48d0-831e-4ad651871d8e"
 }
