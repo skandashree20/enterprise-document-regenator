@@ -1,141 +1,129 @@
 #!/bin/bash
-
-# Import Workflows Script for OneOrigin Document Regeneration System
-# This script imports all workflow JSON files into n8n
+# Import all workflows into n8n database
+# This script imports workflows directly to PostgreSQL, preserving all settings
 
 set -e
 
-# Configuration
-N8N_URL="${N8N_URL:-http://localhost:5678}"
-N8N_API_KEY="${N8N_API_KEY:-}"
-WORKFLOWS_DIR="${WORKFLOWS_DIR:-../workflows}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+WORKFLOWS_DIR="$PROJECT_DIR/workflows"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}OneOrigin Document Regeneration System${NC}"
-echo -e "${GREEN}Workflow Import Script${NC}"
-echo -e "${GREEN}========================================${NC}"
+echo "=== Enterprise Document Regenerator - Workflow Import ==="
 echo ""
 
-# Check if n8n is accessible
-echo -e "${YELLOW}Checking n8n connection...${NC}"
-if ! curl -s -o /dev/null -w "%{http_code}" "$N8N_URL/healthz" | grep -q "200"; then
-    echo -e "${RED}Error: Cannot connect to n8n at $N8N_URL${NC}"
-    echo "Make sure n8n is running and accessible."
+# Check if containers are running
+if ! docker ps | grep -q n8n-postgres-new; then
+    echo "Error: n8n-postgres-new container is not running"
+    echo "Start it with: cd docker && docker compose up -d"
     exit 1
 fi
-echo -e "${GREEN}n8n is accessible at $N8N_URL${NC}"
+
+echo "Importing workflows from $WORKFLOWS_DIR..."
 echo ""
 
-# Function to import a workflow
-import_workflow() {
-    local file=$1
-    local name=$(basename "$file" .json)
+cd "$PROJECT_DIR"
 
-    echo -e "${YELLOW}Importing: $name${NC}"
+# Import all workflow JSON files
+python3 << 'PYEOF'
+import json
+import subprocess
+from pathlib import Path
+import uuid
 
-    if [ -n "$N8N_API_KEY" ]; then
-        # Use API if key is provided
-        response=$(curl -s -X POST "$N8N_URL/api/v1/workflows" \
-            -H "Content-Type: application/json" \
-            -H "X-N8N-API-KEY: $N8N_API_KEY" \
-            -d @"$file")
+WORKFLOWS_DIR = "workflows"
+workflow_files = sorted(Path(WORKFLOWS_DIR).rglob("*.json"))
 
-        if echo "$response" | grep -q '"id"'; then
-            echo -e "${GREEN}  ✓ Imported successfully${NC}"
-        else
-            echo -e "${RED}  ✗ Import failed: $response${NC}"
-        fi
-    else
-        echo -e "${YELLOW}  → Manual import required (no API key)${NC}"
-        echo -e "     File: $file"
-    fi
-}
+skip_files = ['21-document-updater-import.json']
 
-# Import order matters for sub-workflows
-echo -e "${YELLOW}Importing workflows in recommended order...${NC}"
-echo ""
+success = 0
+failed = 0
 
-# Error handling workflows first
-echo -e "${GREEN}--- Error Handling Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/error-handling/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+for wf_file in workflow_files:
+    if wf_file.name in skip_files:
+        continue
 
-# Output workflows
-echo ""
-echo -e "${GREEN}--- Output Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/output/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+    try:
+        with open(wf_file, 'r') as f:
+            workflow = json.load(f)
 
-# Visual workflows
-echo ""
-echo -e "${GREEN}--- Visual Generation Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/visuals/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+        name = workflow.get('name', wf_file.stem)
+        wf_id = workflow.get('id', str(uuid.uuid4())[:16])
+        nodes = json.dumps(workflow.get('nodes', []))
+        connections = json.dumps(workflow.get('connections', {}))
+        settings = json.dumps(workflow.get('settings', {}))
+        static_data = json.dumps(workflow.get('staticData')) if workflow.get('staticData') else 'null'
+        version_id = str(uuid.uuid4())
 
-# Generation workflows
-echo ""
-echo -e "${GREEN}--- Document Generation Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/generation/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+        sql = f"""
+INSERT INTO workflow_entity (id, name, active, nodes, connections, settings, "staticData", "createdAt", "updatedAt", "versionId")
+VALUES (
+    $WF_ID${wf_id}$WF_ID$,
+    $WF_NAME${name}$WF_NAME$,
+    false,
+    $NODES${nodes}$NODES$::jsonb,
+    $CONN${connections}$CONN$::jsonb,
+    $SETTINGS${settings}$SETTINGS$::jsonb,
+    $STATIC${static_data}$STATIC$::jsonb,
+    NOW(),
+    NOW(),
+    $VERSION${version_id}$VERSION$
+)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    nodes = EXCLUDED.nodes,
+    connections = EXCLUDED.connections,
+    settings = EXCLUDED.settings,
+    "updatedAt" = NOW();
+"""
 
-# Enrichment workflows
-echo ""
-echo -e "${GREEN}--- Enrichment Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/enrichment/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+        with open('/tmp/import_wf.sql', 'w') as f:
+            f.write(sql)
 
-# Analysis workflows
-echo ""
-echo -e "${GREEN}--- Analysis Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/analysis/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+        result = subprocess.run(
+            ['docker', 'exec', '-i', 'n8n-postgres-new', 'psql', '-U', 'n8n', '-d', 'n8n'],
+            stdin=open('/tmp/import_wf.sql'),
+            capture_output=True,
+            text=True
+        )
 
-# Processing workflows
-echo ""
-echo -e "${GREEN}--- Processing Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/processing/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+        if result.returncode == 0:
+            print(f"✓ {name}")
+            success += 1
+        else:
+            print(f"✗ {name}: {result.stderr[:50]}")
+            failed += 1
 
-# Ingestion workflows
-echo ""
-echo -e "${GREEN}--- Ingestion Workflows ---${NC}"
-for file in "$WORKFLOWS_DIR"/ingestion/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+    except Exception as e:
+        print(f"✗ Error: {wf_file.name} - {e}")
+        failed += 1
 
-# Main orchestrator last
-echo ""
-echo -e "${GREEN}--- Main Orchestrator ---${NC}"
-for file in "$WORKFLOWS_DIR"/main/*.json; do
-    [ -f "$file" ] && import_workflow "$file"
-done
+print(f"\nImported: {success} | Failed: {failed}")
+PYEOF
 
 echo ""
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Import process complete!${NC}"
-echo -e "${GREEN}========================================${NC}"
+echo "Sharing workflows with default user..."
 
-if [ -z "$N8N_API_KEY" ]; then
-    echo ""
-    echo -e "${YELLOW}Note: No API key was provided.${NC}"
-    echo "To enable automatic import, set the N8N_API_KEY environment variable."
-    echo ""
-    echo "For manual import:"
-    echo "1. Open n8n at $N8N_URL"
-    echo "2. Go to Workflows"
-    echo "3. Click Import from File"
-    echo "4. Select each JSON file from the workflows directory"
-fi
+docker exec -i n8n-postgres-new psql -U n8n -d n8n << 'EOSQL'
+INSERT INTO shared_workflow ("workflowId", "projectId", "role", "createdAt", "updatedAt")
+SELECT w.id, p.id, 'workflow:owner', NOW(), NOW()
+FROM workflow_entity w
+CROSS JOIN (SELECT id FROM project LIMIT 1) p
+ON CONFLICT DO NOTHING;
+EOSQL
+
+echo ""
+echo "Fixing workflow IDs in Main Orchestrator..."
+"$SCRIPT_DIR/fix-workflow-ids.sh"
+
+echo ""
+echo "Fixing Execute Workflow mode settings..."
+"$SCRIPT_DIR/fix-workflow-modes.sh"
+
+echo ""
+echo "=== Import Complete ==="
+echo ""
+echo "Next steps:"
+echo "1. Open n8n at http://localhost:5680"
+echo "2. Configure credentials (Google Drive, OpenAI, Serper API)"
+echo "3. Update source_folder_ids and output_folder_id in Main Orchestrator"
+echo "4. Run the workflow!"
