@@ -198,6 +198,44 @@ This system:
                           ┌─────────────────────────────────┐
                           │    Notify via Google Chat       │
                           └─────────────────────────────────┘
+
+
+                    ═══════════════════════════════════════════
+                                   ERROR FLOW
+                    ═══════════════════════════════════════════
+
+                          ┌─────────────────────────────────┐
+                          │       Error Trigger             │
+                          │   (catches any workflow error)  │
+                          └───────────────┬─────────────────┘
+                                          │
+                                          ▼
+                          ┌─────────────────────────────────┐
+                          │     Format Error Details        │
+                          │  - Extract error message        │
+                          │  - Identify failed node         │
+                          │  - Categorize error type        │
+                          │  - Determine severity           │
+                          └───────────────┬─────────────────┘
+                                          │
+                                          ▼
+                          ┌─────────────────────────────────┐
+                          │          Log Error              │
+                          │  - Console log for debugging    │
+                          │  - Store in static data         │
+                          │  - Keep last 50 errors          │
+                          └───────────────┬─────────────────┘
+                                          │
+                                          ▼
+                          ┌─────────────────────────────────┐
+                          │   Notify Error (Google Chat)    │
+                          │  - Send alert with details      │
+                          └───────────────┬─────────────────┘
+                                          │
+                                          ▼
+                          ┌─────────────────────────────────┐
+                          │        Error Summary            │
+                          └─────────────────────────────────┘
 ```
 
 ---
@@ -665,6 +703,104 @@ if (enrichmentData.higher_ed_trends?.length > 0) {
 - `AIRR_Datasheet_YYYY-MM-DD.md`
 - `OneOrigin_HigherEd_OnePager_YYYY-MM-DD.md`
 - `{original_file}_updated_YYYY-MM-DD.md` (if updates were needed)
+
+---
+
+### Error Handling Flow
+
+The Main Orchestrator includes a comprehensive error handling flow that catches any errors during execution.
+
+#### Error Trigger
+
+**Purpose**: Catches any unhandled errors from any node in the workflow.
+
+**Triggers when**:
+- Any node throws an uncaught exception
+- API calls fail (when `continueOnFail` is not enabled)
+- Code execution errors
+- External workflow failures
+
+---
+
+#### Error Classification
+
+The error handler automatically categorizes errors:
+
+| Category | Detection | Severity | Examples |
+|----------|-----------|----------|----------|
+| `rate_limit` | 429 status or "rate limit" in message | Medium | API quota exceeded |
+| `authentication` | 401/403 status or "auth" in message | Critical | Invalid API keys, expired tokens |
+| `timeout` | "timeout" or "timed out" in message | Medium | Slow API responses |
+| `server_error` | 5xx status codes | High | External service outages |
+| `not_found` | 404 status | Low | Missing files or resources |
+| `parse_error` | "parse" or "json" in message | Medium | Invalid JSON responses |
+| `google_drive` | Failed node contains "drive" | High | Drive API issues |
+| `llm_error` | Failed node contains "openai" or "analyze" | High | LLM API failures |
+| `text_extraction` | Failed node contains "tika" | Medium | Document parsing issues |
+
+---
+
+#### Error Log Structure
+
+```json
+{
+  "timestamp": "2025-01-27T...",
+  "execution_id": "abc123",
+  "workflow_name": "01 - Main Orchestrator",
+  "started_at": "2025-01-27T...",
+  "failed_at": "2025-01-27T...",
+
+  "error": {
+    "message": "API rate limit exceeded",
+    "stack": "...",
+    "category": "rate_limit",
+    "severity": "medium"
+  },
+
+  "failed_node": {
+    "name": "Fetch Enrichment Data",
+    "data_preview": "..."
+  },
+
+  "notification_text": "⚠️ WORKFLOW ERROR..."
+}
+```
+
+---
+
+#### Error Notifications
+
+Errors are sent to Google Chat with:
+- Workflow name
+- Execution ID
+- Failed node name
+- Error category and severity
+- Error message (truncated)
+- Timestamp
+
+**Sample Notification**:
+```
+⚠️ WORKFLOW ERROR
+
+Workflow: 01 - Main Orchestrator
+Execution: abc123
+Failed Node: Fetch Enrichment Data
+Category: rate_limit
+Severity: medium
+
+Error: API rate limit exceeded
+
+Time: 2025-01-27T02:15:30.000Z
+```
+
+---
+
+#### Error Log Storage
+
+- Errors are stored in workflow static data
+- Last 50 errors are retained
+- Accessible for debugging and review
+- Console logs for n8n execution history
 
 ---
 

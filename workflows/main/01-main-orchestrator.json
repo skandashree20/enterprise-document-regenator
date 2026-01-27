@@ -116,7 +116,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "2acc5886-b7f6-47"
+          "value": "d04baeb2-0949-4f"
         },
         "options": {}
       },
@@ -183,7 +183,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "f77af28e-f432-4e"
+          "value": "0ec5c0a5-408d-40"
         },
         "options": {}
       },
@@ -297,7 +297,7 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "98757030-1bfb-4f"
+          "value": "8dfbb6e3-4029-4a"
         },
         "options": {
           "mode": "each"
@@ -586,6 +586,74 @@
       "position": [
         3080,
         -100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format error details for logging and notification\nconst errorData = $input.first().json;\n\n// Extract error information\nconst execution = errorData.execution || {};\nconst workflow = errorData.workflow || {};\nconst errorMessage = execution.error?.message || 'Unknown error';\nconst errorStack = execution.error?.stack || '';\nconst failedNodeName = execution.lastNodeExecuted || 'Unknown node';\n\n// Get execution context\nconst executionId = execution.id || 'unknown';\nconst workflowName = workflow.name || '01 - Main Orchestrator';\nconst startedAt = execution.startedAt || new Date().toISOString();\n\n// Extract data from the failed node if available\nlet failedNodeData = null;\nlet failedNodeInput = null;\ntry {\n  const nodeData = execution.data?.resultData?.runData?.[failedNodeName];\n  if (nodeData && nodeData.length > 0) {\n    const lastRun = nodeData[nodeData.length - 1];\n    failedNodeData = lastRun.error || lastRun.data;\n    failedNodeInput = lastRun.inputData;\n  }\n} catch (e) {\n  // Ignore extraction errors\n}\n\n// Determine error severity and category\nlet errorCategory = 'unknown';\nlet severity = 'high';\n\nif (errorMessage.toLowerCase().includes('rate limit') || errorMessage.includes('429')) {\n  errorCategory = 'rate_limit';\n  severity = 'medium';\n} else if (errorMessage.toLowerCase().includes('auth') || errorMessage.includes('401') || errorMessage.includes('403')) {\n  errorCategory = 'authentication';\n  severity = 'critical';\n} else if (errorMessage.includes('timeout') || errorMessage.toLowerCase().includes('timed out')) {\n  errorCategory = 'timeout';\n  severity = 'medium';\n} else if (errorMessage.includes('5') && errorMessage.includes('00')) {\n  errorCategory = 'server_error';\n  severity = 'high';\n} else if (errorMessage.toLowerCase().includes('not found') || errorMessage.includes('404')) {\n  errorCategory = 'not_found';\n  severity = 'low';\n} else if (errorMessage.toLowerCase().includes('parse') || errorMessage.toLowerCase().includes('json')) {\n  errorCategory = 'parse_error';\n  severity = 'medium';\n} else if (failedNodeName.toLowerCase().includes('drive')) {\n  errorCategory = 'google_drive';\n  severity = 'high';\n} else if (failedNodeName.toLowerCase().includes('openai') || failedNodeName.toLowerCase().includes('analyze')) {\n  errorCategory = 'llm_error';\n  severity = 'high';\n} else if (failedNodeName.toLowerCase().includes('tika')) {\n  errorCategory = 'text_extraction';\n  severity = 'medium';\n}\n\n// Build error log entry\nconst errorLog = {\n  timestamp: new Date().toISOString(),\n  execution_id: executionId,\n  workflow_name: workflowName,\n  started_at: startedAt,\n  failed_at: new Date().toISOString(),\n  \n  error: {\n    message: errorMessage,\n    stack: errorStack.substring(0, 1000),\n    category: errorCategory,\n    severity: severity\n  },\n  \n  failed_node: {\n    name: failedNodeName,\n    data_preview: failedNodeData ? JSON.stringify(failedNodeData).substring(0, 500) : null\n  },\n  \n  // Summary for notification\n  notification_text: `⚠️ WORKFLOW ERROR\\n\\nWorkflow: ${workflowName}\\nExecution: ${executionId}\\nFailed Node: ${failedNodeName}\\nCategory: ${errorCategory}\\nSeverity: ${severity}\\n\\nError: ${errorMessage.substring(0, 200)}\\n\\nTime: ${new Date().toISOString()}`\n};\n\nreturn [{ json: errorLog }];"
+      },
+      "id": "format-error",
+      "name": "Format Error Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error to console and store in static data for potential review\nconst errorLog = $input.first().json;\n\n// Store in workflow static data (persists between executions)\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.error_logs) {\n  staticData.error_logs = [];\n}\n\n// Keep last 50 errors\nstaticData.error_logs.unshift({\n  ...errorLog,\n  logged_at: new Date().toISOString()\n});\nif (staticData.error_logs.length > 50) {\n  staticData.error_logs = staticData.error_logs.slice(0, 50);\n}\n\n// Console log for n8n execution log\nconsole.error('=== WORKFLOW ERROR ===' );\nconsole.error('Execution ID:', errorLog.execution_id);\nconsole.error('Failed Node:', errorLog.failed_node.name);\nconsole.error('Category:', errorLog.error.category);\nconsole.error('Severity:', errorLog.error.severity);\nconsole.error('Message:', errorLog.error.message);\nconsole.error('========================');\n\nreturn [{ json: errorLog }];"
+      },
+      "id": "log-error",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://chat.googleapis.com/v1/spaces/SPACE_ID/messages?key=API_KEY&token=TOKEN",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.notification_text }) }}",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "Notify Error (Google Chat)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        600
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final error summary\nconst errorLog = $input.first().json;\n\nreturn [{\n  json: {\n    status: 'error_logged',\n    execution_id: errorLog.execution_id,\n    failed_node: errorLog.failed_node.name,\n    error_category: errorLog.error.category,\n    error_severity: errorLog.error.severity,\n    error_message: errorLog.error.message,\n    notification_sent: true,\n    processed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "error-summary",
+      "name": "Error Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        600
       ]
     }
   ],
@@ -949,6 +1017,50 @@
         [
           {
             "node": "Notify Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Details": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Notify Error (Google Chat)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Error (Google Chat)": {
+      "main": [
+        [
+          {
+            "node": "Error Summary",
             "type": "main",
             "index": 0
           }
