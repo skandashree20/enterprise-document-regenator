@@ -1,5 +1,4 @@
 {
-  "id": "sWcRjhQCUTDbZW0h",
   "name": "18 - Google Drive Uploader",
   "nodes": [
     {
@@ -8,7 +7,10 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -18,7 +20,10 @@
       "name": "Prepare Upload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -28,7 +33,10 @@
       "name": "Create Binary Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -47,7 +55,10 @@
       "name": "Google Drive - Upload",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "22BxZvZno0IrY9iC",
@@ -83,7 +94,10 @@
       "name": "Check Upload Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -93,7 +107,10 @@
       "name": "Format Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, -100]
+      "position": [
+        1100,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -103,7 +120,10 @@
       "name": "Format Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 100]
+      "position": [
+        1100,
+        100
+      ]
     },
     {
       "parameters": {},
@@ -111,7 +131,10 @@
       "name": "Merge Output",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     }
   ],
   "connections": {
@@ -211,5 +234,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }

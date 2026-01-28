@@ -7,7 +7,10 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -17,7 +20,10 @@
       "name": "Prepare DOCX",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -28,7 +34,10 @@
       "name": "Extract from DOCX",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -58,7 +67,10 @@
       "name": "Check Extraction",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -68,7 +80,10 @@
       "name": "Process Extracted Text",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -103,7 +118,10 @@
       "name": "Set Error",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [880, 100]
+      "position": [
+        880,
+        100
+      ]
     },
     {
       "parameters": {},
@@ -111,7 +129,10 @@
       "name": "Merge Output",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     }
   ],
   "connections": {
@@ -200,5 +221,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }

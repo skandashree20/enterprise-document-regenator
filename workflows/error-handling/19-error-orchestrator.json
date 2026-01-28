@@ -11,7 +11,10 @@
       "name": "Webhook - Error Report",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "error-orchestrator"
     },
     {
@@ -20,7 +23,10 @@
       "name": "Error Trigger",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
-      "position": [0, 200]
+      "position": [
+        0,
+        200
+      ]
     },
     {
       "parameters": {},
@@ -28,7 +34,10 @@
       "name": "Merge Error Sources",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [220, 100]
+      "position": [
+        220,
+        100
+      ]
     },
     {
       "parameters": {
@@ -38,7 +47,10 @@
       "name": "Extract Error Details",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 100]
+      "position": [
+        440,
+        100
+      ]
     },
     {
       "parameters": {
@@ -122,7 +134,10 @@
       "name": "Route by Error Type",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [660, 100]
+      "position": [
+        660,
+        100
+      ]
     },
     {
       "parameters": {
@@ -133,7 +148,10 @@
       "name": "Wait - Rate Limit",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [880, -50]
+      "position": [
+        880,
+        -50
+      ]
     },
     {
       "parameters": {
@@ -144,7 +162,10 @@
       "name": "Wait - Server Error",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [880, 50]
+      "position": [
+        880,
+        50
+      ]
     },
     {
       "parameters": {
@@ -173,7 +194,10 @@
       "name": "Set Auth Action",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [880, 150]
+      "position": [
+        880,
+        150
+      ]
     },
     {
       "parameters": {
@@ -196,7 +220,10 @@
       "name": "Set Other Action",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [880, 250]
+      "position": [
+        880,
+        250
+      ]
     },
     {
       "parameters": {
@@ -208,7 +235,10 @@
       "name": "Merge Actions",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1100, 100]
+      "position": [
+        1100,
+        100
+      ]
     },
     {
       "parameters": {
@@ -223,7 +253,10 @@
       "name": "Send to Notifier",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1320, 100],
+      "position": [
+        1320,
+        100
+      ],
       "continueOnFail": true
     },
     {
@@ -234,7 +267,10 @@
       "name": "Finalize",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 100]
+      "position": [
+        1540,
+        100
+      ]
     }
   ],
   "connections": {
@@ -392,5 +428,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }

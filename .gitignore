@@ -30,6 +30,13 @@ logs/
 *service-account*.json
 *.pem
 *.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+.n8n-api-key
+*-private-key*.json
 
 # Temporary files
 tmp/

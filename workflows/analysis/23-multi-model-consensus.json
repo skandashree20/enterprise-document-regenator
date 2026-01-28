@@ -1,0 +1,151 @@
+{
+  "name": "23 - Two-Model Consensus (OpenAI + Gemini)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "id", "value": "BvHmgECJ524epfsK" },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "call-openai",
+      "name": "Analyze with OpenAI",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [220, -50],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "id", "value": "79b8nF76eUwL3N9o" },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "call-gemini",
+      "name": "Analyze with Gemini",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [220, 50],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-results",
+      "name": "Merge All Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst inputData = $('Execute Workflow Trigger').first().json;\n\nconst results = {\n  openai: null,\n  gemini: null\n};\n\nfor (const item of items) {\n  const analyzer = item.json.analyzer;\n  if (analyzer && results.hasOwnProperty(analyzer)) {\n    results[analyzer] = item.json.analysis;\n  }\n}\n\nconst validResults = Object.values(results).filter(r => r !== null);\n\nif (validResults.length === 0) {\n  return [{\n    json: {\n      file_id: inputData.file_id,\n      file_name: inputData.file_name,\n      consensus: null,\n      error: 'All analyzers failed',\n      models_used: 0\n    }\n  }];\n}\n\nconst consensus = {\n  document_type: getMostCommon(validResults.map(r => r.document_type)),\n  main_topics: mergeArrays(validResults.map(r => r.main_topics || [])),\n  key_points: mergeArrays(validResults.map(r => r.key_points || [])),\n  target_audience: getMostCommon(validResults.map(r => r.target_audience)),\n  gaps: mergeArrays(validResults.map(r => r.gaps || [])),\n  recommendations: mergeArrays(validResults.map(r => r.recommendations || [])),\n  relevance_score: average(validResults.map(r => r.relevance_score || 0)),\n  quality_score: average(validResults.map(r => r.quality_score || 0)),\n  needs_update: validResults.filter(r => r.needs_update).length > validResults.length / 2,\n  update_priority: getMostCommon(validResults.map(r => r.update_priority)),\n  summary: validResults[0]?.summary || '',\n  confidence: validResults.length / 2,\n  models_agreed: calculateAgreement(validResults)\n};\n\nfunction getMostCommon(arr) {\n  if (!arr || arr.length === 0) return 'unknown';\n  const counts = {};\n  arr.forEach(item => counts[item] = (counts[item] || 0) + 1);\n  return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);\n}\n\nfunction mergeArrays(arrays) {\n  const merged = [];\n  const seen = new Set();\n  arrays.forEach(arr => {\n    if (Array.isArray(arr)) {\n      arr.forEach(item => {\n        const key = typeof item === 'string' ? item.toLowerCase() : JSON.stringify(item);\n        if (!seen.has(key)) {\n          seen.add(key);\n          merged.push(item);\n        }\n      });\n    }\n  });\n  return merged;\n}\n\nfunction average(numbers) {\n  const valid = numbers.filter(n => typeof n === 'number' && !isNaN(n));\n  return valid.length > 0 ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length * 10) / 10 : 0;\n}\n\nfunction calculateAgreement(results) {\n  if (results.length < 2) return 1;\n  let agreements = 0;\n  let comparisons = 0;\n  \n  for (let i = 0; i < results.length; i++) {\n    for (let j = i + 1; j < results.length; j++) {\n      comparisons++;\n      if (results[i].document_type === results[j].document_type) agreements++;\n      if (results[i].needs_update === results[j].needs_update) agreements++;\n      if (Math.abs((results[i].quality_score || 0) - (results[j].quality_score || 0)) <= 2) agreements++;\n    }\n  }\n  \n  return Math.round(agreements / (comparisons * 3) * 100) / 100;\n}\n\nreturn [{\n  json: {\n    file_id: inputData.file_id,\n    file_name: inputData.file_name,\n    consensus: consensus,\n    individual_results: results,\n    models_used: validResults.length,\n    analyzed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "build-consensus",
+      "name": "Build Consensus",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "low-confidence",
+              "leftValue": "={{ $json.consensus.confidence }}",
+              "rightValue": 0.5,
+              "operator": { "type": "number", "operation": "lt" }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "check-confidence",
+      "name": "Check Confidence",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: {\n    ...item,\n    warning: 'Low confidence - only ' + item.models_used + ' model(s) succeeded',\n    recommendation: 'Manual review recommended'\n  }\n}];"
+      },
+      "id": "flag-low-confidence",
+      "name": "Flag Low Confidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -50]
+    },
+    {
+      "parameters": {},
+      "id": "high-confidence",
+      "name": "High Confidence",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1100, 50]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-output",
+      "name": "Merge Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Analyze with OpenAI", "type": "main", "index": 0 },
+          { "node": "Analyze with Gemini", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Analyze with OpenAI": {
+      "main": [[{ "node": "Merge All Results", "type": "main", "index": 0 }]]
+    },
+    "Analyze with Gemini": {
+      "main": [[{ "node": "Merge All Results", "type": "main", "index": 1 }]]
+    },
+    "Merge All Results": {
+      "main": [[{ "node": "Build Consensus", "type": "main", "index": 0 }]]
+    },
+    "Build Consensus": {
+      "main": [[{ "node": "Check Confidence", "type": "main", "index": 0 }]]
+    },
+    "Check Confidence": {
+      "main": [
+        [{ "node": "Flag Low Confidence", "type": "main", "index": 0 }],
+        [{ "node": "High Confidence", "type": "main", "index": 0 }]
+      ]
+    },
+    "Flag Low Confidence": {
+      "main": [[{ "node": "Merge Output", "type": "main", "index": 0 }]]
+    },
+    "High Confidence": {
+      "main": [[{ "node": "Merge Output", "type": "main", "index": 1 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "analysis" }, { "name": "consensus" }],
+  "active": false,
+  "versionId": "1"
+}

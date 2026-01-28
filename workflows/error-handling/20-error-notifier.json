@@ -7,17 +7,23 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Build Google Chat notification card\nconst item = $input.first().json;\n\nconst priorityColors = {\n  'auth_failure': '#FF0000',\n  'quota_exceeded': '#FF0000',\n  'rate_limit': '#FFA500',\n  'server_error': '#FFA500',\n  'network_error': '#FFA500',\n  'validation_error': '#FFFF00',\n  'unknown': '#808080'\n};\n\nconst priorityLabels = {\n  'auth_failure': 'HIGH',\n  'quota_exceeded': 'HIGH',\n  'rate_limit': 'MEDIUM',\n  'server_error': 'MEDIUM',\n  'network_error': 'MEDIUM',\n  'validation_error': 'LOW',\n  'unknown': 'LOW'\n};\n\nconst errorType = item.error_type || 'unknown';\nconst priority = priorityLabels[errorType] || 'LOW';\n\n// Google Chat Card format\nconst chatCard = {\n  cards: [{\n    header: {\n      title: '🚨 Document Regeneration Error',\n      subtitle: `${item.workflow_name || 'Unknown Workflow'} - ${priority} Priority`,\n      imageUrl: 'https://developers.google.com/chat/images/quickstart-app-avatar.png',\n      imageStyle: 'AVATAR'\n    },\n    sections: [\n      {\n        widgets: [\n          {\n            keyValue: {\n              topLabel: 'Error ID',\n              content: item.error_id || 'N/A'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Error Type',\n              content: errorType.replace('_', ' ').toUpperCase()\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Node',\n              content: item.node_name || 'Unknown'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Time',\n              content: item.timestamp || new Date().toISOString()\n            }\n          }\n        ]\n      },\n      {\n        header: 'Error Message',\n        widgets: [\n          {\n            textParagraph: {\n              text: (item.error_message || 'No error message available').substring(0, 500)\n            }\n          }\n        ]\n      },\n      {\n        widgets: [\n          {\n            buttons: [\n              {\n                textButton: {\n                  text: 'View in n8n',\n                  onClick: {\n                    openLink: {\n                      url: `${$env.N8N_HOST || 'http://localhost:5678'}/workflow/${item.workflow_id || ''}`\n                    }\n                  }\n                }\n              }\n            ]\n          }\n        ]\n      }\n    ]\n  }]\n};\n\nreturn [{\n  json: {\n    chat_card: chatCard,\n    priority: priority,\n    error_type: errorType,\n    requires_action: item.requires_manual_intervention === 'true'\n  }\n}];"
+        "jsCode": "// Build Google Chat notification card\nconst item = $input.first().json;\n\nconst priorityColors = {\n  'auth_failure': '#FF0000',\n  'quota_exceeded': '#FF0000',\n  'rate_limit': '#FFA500',\n  'server_error': '#FFA500',\n  'network_error': '#FFA500',\n  'validation_error': '#FFFF00',\n  'unknown': '#808080'\n};\n\nconst priorityLabels = {\n  'auth_failure': 'HIGH',\n  'quota_exceeded': 'HIGH',\n  'rate_limit': 'MEDIUM',\n  'server_error': 'MEDIUM',\n  'network_error': 'MEDIUM',\n  'validation_error': 'LOW',\n  'unknown': 'LOW'\n};\n\nconst errorType = item.error_type || 'unknown';\nconst priority = priorityLabels[errorType] || 'LOW';\n\n// Google Chat Card format\nconst chatCard = {\n  cards: [{\n    header: {\n      title: '\ud83d\udea8 Document Regeneration Error',\n      subtitle: `${item.workflow_name || 'Unknown Workflow'} - ${priority} Priority`,\n      imageUrl: 'https://developers.google.com/chat/images/quickstart-app-avatar.png',\n      imageStyle: 'AVATAR'\n    },\n    sections: [\n      {\n        widgets: [\n          {\n            keyValue: {\n              topLabel: 'Error ID',\n              content: item.error_id || 'N/A'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Error Type',\n              content: errorType.replace('_', ' ').toUpperCase()\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Node',\n              content: item.node_name || 'Unknown'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Time',\n              content: item.timestamp || new Date().toISOString()\n            }\n          }\n        ]\n      },\n      {\n        header: 'Error Message',\n        widgets: [\n          {\n            textParagraph: {\n              text: (item.error_message || 'No error message available').substring(0, 500)\n            }\n          }\n        ]\n      },\n      {\n        widgets: [\n          {\n            buttons: [\n              {\n                textButton: {\n                  text: 'View in n8n',\n                  onClick: {\n                    openLink: {\n                      url: `${$env.N8N_HOST || 'http://localhost:5678'}/workflow/${item.workflow_id || ''}`\n                    }\n                  }\n                }\n              }\n            ]\n          }\n        ]\n      }\n    ]\n  }]\n};\n\nreturn [{\n  json: {\n    chat_card: chatCard,\n    priority: priority,\n    error_type: errorType,\n    requires_action: item.requires_manual_intervention === 'true'\n  }\n}];"
       },
       "id": "build-card",
       "name": "Build Chat Card",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -31,7 +37,10 @@
       "name": "Send to Google Chat",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -61,7 +70,10 @@
       "name": "Check High Priority",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -71,7 +83,10 @@
       "name": "High Priority Action",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {},
@@ -79,7 +94,10 @@
       "name": "No Additional Action",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [880, 100]
+      "position": [
+        880,
+        100
+      ]
     },
     {
       "parameters": {},
@@ -87,7 +105,10 @@
       "name": "Merge Output",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -97,7 +118,10 @@
       "name": "Finalize",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     }
   ],
   "connections": {
@@ -197,5 +221,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }

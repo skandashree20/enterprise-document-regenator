@@ -1,53 +1,251 @@
 {
-  "id": "G1NX0hEbyVM407us",
   "name": "01 - Main Orchestrator",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 2 * * *"
-            }
-          ]
-        }
+        "jsCode": "// Accumulate analyzed results in static data for later use\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.accumulated_docs) {\n  staticData.accumulated_docs = [];\n}\n\nconst items = $input.all();\nfor (const item of items) {\n  staticData.accumulated_docs.push(item.json);\n}\n\nconsole.log('Batch accumulated. Total docs so far:', staticData.accumulated_docs.length);\n\n// Pass through all items for the update branch - properly formatted\nreturn items.map(item => ({ json: item.json }));"
       },
-      "id": "schedule-trigger",
-      "name": "Schedule Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "id": "accumulate-results",
+      "name": "Accumulate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        0,
-        0
+        2860,
+        100
       ]
     },
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "run-regeneration",
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "uploaded_documents",
         "options": {}
       },
-      "id": "manual-trigger",
-      "name": "Manual Trigger (Webhook)",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "aggregate-uploads",
+      "name": "Aggregate Uploads",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
       "position": [
-        0,
-        200
-      ],
-      "webhookId": "run-regeneration"
+        4180,
+        -100
+      ]
     },
     {
-      "parameters": {},
-      "id": "merge-triggers",
-      "name": "Merge Triggers",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BvHmgECJ524epfsK"
+        },
+        "options": {
+          "mode": "each",
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "analyze-doc",
+      "name": "Analyze Document",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
-        220,
+        2750,
+        100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.accumulated_docs = [];\nreturn $input.all();"
+      },
+      "id": "clear-static",
+      "name": "Clear Static Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
         100
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst initVars = $('Initialize Variables').first().json;\n\nlet context = {\n  company_snippet: null,\n  enrichment_data: null,\n  config: { source_folder_ids: [], output_folder_id: '', batch_size: 5 }\n};\n\ntry {\n  const folderIds = initVars.source_folder_ids;\n  context.config.source_folder_ids = typeof folderIds === 'string' ? JSON.parse(folderIds) : folderIds;\n} catch (e) {\n  context.config.source_folder_ids = [];\n}\ncontext.config.output_folder_id = initVars.output_folder_id || '';\ncontext.config.batch_size = parseInt(initVars.batch_size) || 5;\n\nfor (const item of items) {\n  if (item.json.company_snippet) context.company_snippet = item.json.company_snippet;\n  if (item.json.edtech_news || item.json.ferpa_updates) context.enrichment_data = item.json;\n}\n\nreturn [{ json: context }];"
+      },
+      "id": "combine-context",
+      "name": "Combine Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.file_id }}"
+        },
+        "options": {}
+      },
+      "id": "download-file",
+      "name": "Download from Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1870,
+        100
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "22BxZvZno0IrY9iC",
+          "name": "Google Drive account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Zc6mV1sKvl5W9Mfx"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "fetch-enrichment",
+      "name": "Fetch Enrichment Data",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        200
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "0SQrRxgwgIG0PBOn"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "fetch-snippet",
+      "name": "Fetch Company Snippet",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "needs-update",
+              "leftValue": "={{ $json.needs_update }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-updated",
+      "name": "Filter Updated Docs",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process ALL items from Tika, not just the first one\nconst items = $input.all();\nconst preparedItems = $('Prepare Documents').all();\n\nreturn items.map((item, index) => {\n  const tikaResponse = item.json;\n  const preparedDoc = preparedItems[index]?.json || {};\n\n  const fileName = preparedDoc.file_name || 'unknown';\n  const fileId = preparedDoc.file_id || '';\n  const extension = (preparedDoc.extension || fileName.split('.').pop() || '').toLowerCase();\n  const mimeType = preparedDoc.mime_type || 'application/octet-stream';\n\n  let extractedText = '';\n  let processorType = 'tika';\n  let status = 'processed';\n\n  if (tikaResponse.error || tikaResponse.code || (tikaResponse.statusCode && tikaResponse.statusCode >= 400)) {\n    extractedText = `Tika extraction failed: ${tikaResponse.error || tikaResponse.message || JSON.stringify(tikaResponse)}`;\n    processorType = 'tika_error';\n    status = 'error';\n  } else if (typeof tikaResponse === 'string') {\n    extractedText = tikaResponse;\n  } else if (tikaResponse.data) {\n    extractedText = tikaResponse.data;\n  } else {\n    extractedText = JSON.stringify(tikaResponse);\n  }\n\n  if (extractedText && typeof extractedText === 'string') {\n    extractedText = extractedText.replace(/\\r\\n/g, '\\n').replace(/\\r/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n  }\n\n  if (!extractedText || extractedText.length < 50) {\n    extractedText = `Document: ${fileName}\\nType: ${extension.toUpperCase()} file\\nNote: Text extraction returned minimal content.`;\n    processorType = 'placeholder';\n  }\n\n  return {\n    json: {\n      file_id: fileId,\n      file_name: fileName,\n      mime_type: mimeType,\n      extension: extension,\n      file_size: preparedDoc.file_size || 0,\n      status: status,\n      processor_type: processorType,\n      extracted_text: extractedText.substring(0, 50000),\n      text_length: extractedText.length,\n      processed_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "format-tika",
+      "name": "Format Tika Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2310,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.generator_id }}"
+        },
+        "options": {
+          "mode": "each",
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "generate-doc",
+      "name": "Generate Document",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3520,
+        -100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst uploads = item.json.uploaded_documents || [];\nconst successful = uploads.filter(u => u.status === 'uploaded');\nconst failed = uploads.filter(u => u.status !== 'uploaded');\n\nconst summary = {\n  execution_id: $execution.id,\n  status: failed.length === 0 ? 'completed' : 'completed_with_errors',\n  documents_generated: uploads.length,\n  successful_uploads: successful.length,\n  failed_uploads: failed.length,\n  uploaded_files: successful.map(u => ({ file_name: u.file_name, file_id: u.file_id, web_link: u.web_link })),\n  errors: failed.map(f => f.error || 'Unknown error'),\n  completed_at: new Date().toISOString()\n};\n\nreturn [{ json: summary }];"
+      },
+      "id": "generate-summary",
+      "name": "Generate Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4400,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jNEJJdPLSGjWgFwS"
+        },
+        "options": {
+          "mode": "each",
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "generate-visuals",
+      "name": "Generate Visuals",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3740,
+        -100
+      ],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -100,54 +298,44 @@
     },
     {
       "parameters": {
-        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.accumulated_docs = [];\nreturn $input.all();"
+        "jsCode": "// Log skipped documents (no updates needed)\nconst items = $input.all();\nreturn items.map(item => ({\n  json: {\n    file_name: item.json.file_name,\n    status: 'no_update_needed',\n    reason: item.json.update_summary || 'Document is up to date'\n  }\n}));"
       },
-      "id": "clear-static",
-      "name": "Clear Static Data",
+      "id": "log-skipped",
+      "name": "Log Skipped Updates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        550,
-        100
+        3740,
+        400
       ]
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "2acc5886-b7f6-47"
-        },
+        "httpMethod": "POST",
+        "path": "run-regeneration",
         "options": {}
       },
-      "id": "fetch-snippet",
-      "name": "Fetch Company Snippet",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
+      "id": "manual-trigger",
+      "name": "Manual Trigger (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
-        660,
-        0
-      ],
-      "continueOnFail": true
+        0,
+        200
+      ]
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "cb2b39eb-a61a-41"
-        },
-        "options": {}
+        "mode": "append"
       },
-      "id": "fetch-enrichment",
-      "name": "Fetch Enrichment Data",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
+      "id": "merge-branch-end",
+      "name": "Merge Branch End",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
       "position": [
-        660,
-        200
-      ],
-      "continueOnFail": true
+        3740,
+        300
+      ]
     },
     {
       "parameters": {
@@ -166,36 +354,46 @@
       ]
     },
     {
-      "parameters": {
-        "jsCode": "const items = $input.all();\nconst initVars = $('Initialize Variables').first().json;\n\nlet context = {\n  company_snippet: null,\n  enrichment_data: null,\n  config: { source_folder_ids: [], output_folder_id: '', batch_size: 5 }\n};\n\ntry {\n  const folderIds = initVars.source_folder_ids;\n  context.config.source_folder_ids = typeof folderIds === 'string' ? JSON.parse(folderIds) : folderIds;\n} catch (e) {\n  context.config.source_folder_ids = [];\n}\ncontext.config.output_folder_id = initVars.output_folder_id || '';\ncontext.config.batch_size = parseInt(initVars.batch_size) || 5;\n\nfor (const item of items) {\n  if (item.json.company_snippet) context.company_snippet = item.json.company_snippet;\n  if (item.json.edtech_news || item.json.ferpa_updates) context.enrichment_data = item.json;\n}\n\nreturn [{ json: context }];"
-      },
-      "id": "combine-context",
-      "name": "Combine Context",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "parameters": {},
+      "id": "merge-triggers",
+      "name": "Merge Triggers",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
       "position": [
-        1100,
+        220,
         100
       ]
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "f77af28e-f432-4e"
-        },
+        "url": "https://chat.googleapis.com/v1/spaces/SPACE_ID/messages?key=API_KEY&token=TOKEN",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\": \"Document Regeneration Complete - Generated: {{ $json.documents_generated }}, Uploaded: {{ $json.successful_uploads }}, Failed: {{ $json.failed_uploads }}\"}",
         "options": {}
       },
-      "id": "scan-drive",
-      "name": "Scan Google Drive",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
+      "id": "notify-completion",
+      "name": "Notify Completion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        1320,
-        100
+        4620,
+        -100
       ],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst processedDocs = items.map(item => item.json);\nconst context = $('Combine Context').first().json;\n\nconst debugInfo = {\n  input_count: processedDocs.length,\n  sample_doc: processedDocs[0] ? Object.keys(processedDocs[0]) : [],\n  has_extracted_text: processedDocs[0]?.extracted_text ? true : false,\n  first_doc_text_length: processedDocs[0]?.text_length || 0,\n  first_doc_text_preview: processedDocs[0]?.extracted_text?.substring(0, 200) || 'none'\n};\n\nif (processedDocs.length === 0) {\n  return [{ json: { status: 'no_documents', message: 'No documents received.', debug: debugInfo } }];\n}\n\nreturn processedDocs.map((doc, i) => ({\n  json: {\n    ...doc,\n    analyzer_workflow: i % 2 === 0 ? '08 - Document Analyzer OpenAI' : '09 - Document Analyzer Gemini',\n    company_snippet: context.company_snippet,\n    enrichment_data: context.enrichment_data,\n    debug_prepare: debugInfo\n  }\n}));"
+      },
+      "id": "prepare-analysis",
+      "name": "Prepare for Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2530,
+        100
+      ]
     },
     {
       "parameters": {
@@ -212,29 +410,103 @@
     },
     {
       "parameters": {
-        "operation": "download",
-        "fileId": {
+        "jsCode": "// Prepare each analyzed document for update checking\n// Merge analysis results with original extracted text + enrichment context\nconst items = $input.all();\nconst tikaItems = $('Format Tika Response').all();\nconst context = $('Combine Context').first().json;\n\nreturn items.map((item, index) => {\n  const analysis = item.json.analysis || item.json;\n  const tikaData = tikaItems[index]?.json || {};\n  \n  return {\n    json: {\n      file_id: item.json.file_id || tikaData.file_id,\n      file_name: item.json.file_name || tikaData.file_name,\n      extracted_text: tikaData.extracted_text || '',\n      analysis: analysis,\n      output_folder_id: context.config?.output_folder_id || '',\n      config: context.config,\n      // Add enrichment data and company snippet for better update context\n      enrichment_data: context.enrichment_data || {},\n      company_snippet: context.company_snippet || ''\n    }\n  };\n});"
+      },
+      "id": "prepare-update",
+      "name": "Prepare for Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retrieve all accumulated results from static data\nconst staticData = $getWorkflowStaticData('global');\nconst allDocs = staticData.accumulated_docs || [];\n\nconsole.log('All batches complete. Total documents:', allDocs.length);\n\n// Clear static data for next run\nstaticData.accumulated_docs = [];\n\n// Return as aggregated result for generation\nreturn [{ json: { analyzed_documents: allDocs } }];"
+      },
+      "id": "retrieve-all-results",
+      "name": "Retrieve All Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst analyzedDocs = item.json.analyzed_documents || [];\nconst context = item.json;\nconst combineContext = $('Combine Context').first().json;\nconst outputFolderId = combineContext.config?.output_folder_id || '';\n\nconst generationRequests = [\n  { generator_id: 'Adlw6GFK6dfNNZ7X', generator_name: '12 - Corporate Overview Generator', document_type: 'corporate_overview', analyzed_documents: analyzedDocs, company_snippet: context.company_snippet, enrichment_data: context.enrichment_data, output_folder_id: outputFolderId },\n  { generator_id: 'ZhLZfoIafT5fDoq7', generator_name: '13 - Product Datasheet Generator', document_type: 'product_datasheet', product_name: 'AIRR', analyzed_documents: analyzedDocs, company_snippet: context.company_snippet, enrichment_data: context.enrichment_data, output_folder_id: outputFolderId },\n  { generator_id: 'DeeROqhJo4eQcfYk', generator_name: '14 - Higher Ed One-Pager Generator', document_type: 'higher_ed_onepager', analyzed_documents: analyzedDocs, company_snippet: context.company_snippet, enrichment_data: context.enrichment_data, output_folder_id: outputFolderId }\n];\n\nreturn generationRequests.map(req => ({ json: req }));"
+      },
+      "id": "route-generators",
+      "name": "Route to Generators",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $json.file_id }}"
+          "value": "uCwI1pQ0arpZU6Yx"
         },
-        "options": {}
-      },
-      "id": "download-file",
-      "name": "Download from Drive",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        1870,
-        100
-      ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "22BxZvZno0IrY9iC",
-          "name": "Google Drive account"
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "folder_ids": "={{ $json.config.source_folder_ids }}"
+          }
         }
       },
+      "id": "scan-drive",
+      "name": "Scan Google Drive",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        100
+      ],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": "={{ $('Initialize Variables').item.json.batch_size }}",
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1650,
+        100
+      ]
     },
     {
       "parameters": {
@@ -268,73 +540,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Process ALL items from Tika, not just the first one\nconst items = $input.all();\nconst preparedItems = $('Prepare Documents').all();\n\nreturn items.map((item, index) => {\n  const tikaResponse = item.json;\n  const preparedDoc = preparedItems[index]?.json || {};\n\n  const fileName = preparedDoc.file_name || 'unknown';\n  const fileId = preparedDoc.file_id || '';\n  const extension = (preparedDoc.extension || fileName.split('.').pop() || '').toLowerCase();\n  const mimeType = preparedDoc.mime_type || 'application/octet-stream';\n\n  let extractedText = '';\n  let processorType = 'tika';\n  let status = 'processed';\n\n  if (tikaResponse.error || tikaResponse.code || (tikaResponse.statusCode && tikaResponse.statusCode >= 400)) {\n    extractedText = `Tika extraction failed: ${tikaResponse.error || tikaResponse.message || JSON.stringify(tikaResponse)}`;\n    processorType = 'tika_error';\n    status = 'error';\n  } else if (typeof tikaResponse === 'string') {\n    extractedText = tikaResponse;\n  } else if (tikaResponse.data) {\n    extractedText = tikaResponse.data;\n  } else {\n    extractedText = JSON.stringify(tikaResponse);\n  }\n\n  if (extractedText && typeof extractedText === 'string') {\n    extractedText = extractedText.replace(/\\r\\n/g, '\\n').replace(/\\r/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n  }\n\n  if (!extractedText || extractedText.length < 50) {\n    extractedText = `Document: ${fileName}\\nType: ${extension.toUpperCase()} file\\nNote: Text extraction returned minimal content.`;\n    processorType = 'placeholder';\n  }\n\n  return {\n    json: {\n      file_id: fileId,\n      file_name: fileName,\n      mime_type: mimeType,\n      extension: extension,\n      file_size: preparedDoc.file_size || 0,\n      status: status,\n      processor_type: processorType,\n      extracted_text: extractedText.substring(0, 50000),\n      text_length: extractedText.length,\n      processed_at: new Date().toISOString()\n    }\n  };\n});"
-      },
-      "id": "format-tika",
-      "name": "Format Tika Response",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2310,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $input.all();\nconst processedDocs = items.map(item => item.json);\nconst context = $('Combine Context').first().json;\n\nconst debugInfo = {\n  input_count: processedDocs.length,\n  sample_doc: processedDocs[0] ? Object.keys(processedDocs[0]) : [],\n  has_extracted_text: processedDocs[0]?.extracted_text ? true : false,\n  first_doc_text_length: processedDocs[0]?.text_length || 0,\n  first_doc_text_preview: processedDocs[0]?.extracted_text?.substring(0, 200) || 'none'\n};\n\nif (processedDocs.length === 0) {\n  return [{ json: { status: 'no_documents', message: 'No documents received.', debug: debugInfo } }];\n}\n\nreturn processedDocs.map((doc, i) => ({\n  json: {\n    ...doc,\n    analyzer_workflow: i % 2 === 0 ? '08 - Document Analyzer OpenAI' : '09 - Document Analyzer Gemini',\n    company_snippet: context.company_snippet,\n    enrichment_data: context.enrichment_data,\n    debug_prepare: debugInfo\n  }\n}));"
-      },
-      "id": "prepare-analysis",
-      "name": "Prepare for Analysis",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2530,
-        100
-      ]
-    },
-    {
-      "parameters": {
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "98757030-1bfb-4f"
+          "value": "Bhey7Pf0xP0DH0Y6"
         },
         "options": {
-          "mode": "each"
-        }
-      },
-      "id": "analyze-doc",
-      "name": "Analyze Document",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [
-        2750,
-        100
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "// Prepare each analyzed document for update checking\n// Merge analysis results with original extracted text + enrichment context\nconst items = $input.all();\nconst tikaItems = $('Format Tika Response').all();\nconst context = $('Combine Context').first().json;\n\nreturn items.map((item, index) => {\n  const analysis = item.json.analysis || item.json;\n  const tikaData = tikaItems[index]?.json || {};\n  \n  return {\n    json: {\n      file_id: item.json.file_id || tikaData.file_id,\n      file_name: item.json.file_name || tikaData.file_name,\n      extracted_text: tikaData.extracted_text || '',\n      analysis: analysis,\n      output_folder_id: context.config?.output_folder_id || '',\n      config: context.config,\n      // Add enrichment data and company snippet for better update context\n      enrichment_data: context.enrichment_data || {},\n      company_snippet: context.company_snippet || ''\n    }\n  };\n});"
-      },
-      "id": "prepare-update",
-      "name": "Prepare for Update",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3080,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "DOC_UPDATER_001"
-        },
-        "options": {
-          "mode": "each"
+          "mode": "each",
+          "waitForSubWorkflow": true
         }
       },
       "id": "update-doc",
@@ -349,134 +562,14 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "needs-update",
-              "leftValue": "={{ $json.needs_update }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "filter-updated",
-      "name": "Filter Updated Docs",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        3520,
-        300
-      ]
-    },
-    {
-      "parameters": {
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "sWcRjhQCUTDbZW0h"
+          "value": "6irPjdjzFrh7yKL8"
         },
         "options": {
-          "mode": "each"
-        }
-      },
-      "id": "upload-updated",
-      "name": "Upload Updated Docs",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [
-        3740,
-        200
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "// Log skipped documents (no updates needed)\nconst items = $input.all();\nreturn items.map(item => ({\n  json: {\n    file_name: item.json.file_name,\n    status: 'no_update_needed',\n    reason: item.json.update_summary || 'Document is up to date'\n  }\n}));"
-      },
-      "id": "log-skipped",
-      "name": "Log Skipped Updates",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3740,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const item = $input.first();\nconst analyzedDocs = item.json.analyzed_documents || [];\nconst context = item.json;\nconst combineContext = $('Combine Context').first().json;\nconst outputFolderId = combineContext.config?.output_folder_id || '';\n\nconst generationRequests = [\n  { generator_id: 'Adlw6GFK6dfNNZ7X', generator_name: '12 - Corporate Overview Generator', document_type: 'corporate_overview', analyzed_documents: analyzedDocs, company_snippet: context.company_snippet, enrichment_data: context.enrichment_data, output_folder_id: outputFolderId },\n  { generator_id: 'ZhLZfoIafT5fDoq7', generator_name: '13 - Product Datasheet Generator', document_type: 'product_datasheet', product_name: 'AIRR', analyzed_documents: analyzedDocs, company_snippet: context.company_snippet, enrichment_data: context.enrichment_data, output_folder_id: outputFolderId },\n  { generator_id: 'DeeROqhJo4eQcfYk', generator_name: '14 - Higher Ed One-Pager Generator', document_type: 'higher_ed_onepager', analyzed_documents: analyzedDocs, company_snippet: context.company_snippet, enrichment_data: context.enrichment_data, output_folder_id: outputFolderId }\n];\n\nreturn generationRequests.map(req => ({ json: req }));"
-      },
-      "id": "route-generators",
-      "name": "Route to Generators",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3300,
-        -100
-      ]
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $json.generator_id }}"
-        },
-        "options": {
-          "mode": "each"
-        }
-      },
-      "id": "generate-doc",
-      "name": "Generate Document",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [
-        3520,
-        -100
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "eNk7PykRD4mFqREB"
-        },
-        "options": {
-          "mode": "each"
-        }
-      },
-      "id": "generate-visuals",
-      "name": "Generate Visuals",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [
-        3740,
-        -100
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "sWcRjhQCUTDbZW0h"
-        },
-        "options": {
-          "mode": "each"
+          "mode": "each",
+          "waitForSubWorkflow": true
         }
       },
       "id": "upload-doc",
@@ -491,102 +584,25 @@
     },
     {
       "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "destinationFieldName": "uploaded_documents",
-        "options": {}
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6irPjdjzFrh7yKL8"
+        },
+        "options": {
+          "mode": "each",
+          "waitForSubWorkflow": true
+        }
       },
-      "id": "aggregate-uploads",
-      "name": "Aggregate Uploads",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
-      "position": [
-        4180,
-        -100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const item = $input.first();\nconst uploads = item.json.uploaded_documents || [];\nconst successful = uploads.filter(u => u.status === 'uploaded');\nconst failed = uploads.filter(u => u.status !== 'uploaded');\n\nconst summary = {\n  execution_id: $execution.id,\n  status: failed.length === 0 ? 'completed' : 'completed_with_errors',\n  documents_generated: uploads.length,\n  successful_uploads: successful.length,\n  failed_uploads: failed.length,\n  uploaded_files: successful.map(u => ({ file_name: u.file_name, file_id: u.file_id, web_link: u.web_link })),\n  errors: failed.map(f => f.error || 'Unknown error'),\n  completed_at: new Date().toISOString()\n};\n\nreturn [{ json: summary }];"
-      },
-      "id": "generate-summary",
-      "name": "Generate Summary",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4400,
-        -100
-      ]
-    },
-    {
-      "parameters": {
-        "url": "https://chat.googleapis.com/v1/spaces/SPACE_ID/messages?key=API_KEY&token=TOKEN",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"text\": \"Document Regeneration Complete - Generated: {{ $json.documents_generated }}, Uploaded: {{ $json.successful_uploads }}, Failed: {{ $json.failed_uploads }}\"}",
-        "options": {}
-      },
-      "id": "notify-completion",
-      "name": "Notify Completion",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        4620,
-        -100
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "batchSize": "={{ $('Initialize Variables').first().json.batch_size || 5 }}",
-        "options": {}
-      },
-      "id": "split-batches",
-      "name": "Split Into Batches",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        1650,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Accumulate analyzed results in static data for later use\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.accumulated_docs) {\n  staticData.accumulated_docs = [];\n}\n\nconst items = $input.all();\nfor (const item of items) {\n  staticData.accumulated_docs.push(item.json);\n}\n\nconsole.log('Batch accumulated. Total docs so far:', staticData.accumulated_docs.length);\n\n// Pass through all items for the update branch - properly formatted\nreturn items.map(item => ({ json: item.json }));"
-      },
-      "id": "accumulate-results",
-      "name": "Accumulate Results",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2860,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "append"
-      },
-      "id": "merge-branch-end",
-      "name": "Merge Branch End",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
+      "id": "upload-updated",
+      "name": "Upload Updated Docs",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
         3740,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Retrieve all accumulated results from static data\nconst staticData = $getWorkflowStaticData('global');\nconst allDocs = staticData.accumulated_docs || [];\n\nconsole.log('All batches complete. Total documents:', allDocs.length);\n\n// Clear static data for next run\nstaticData.accumulated_docs = [];\n\n// Return as aggregated result for generation\nreturn [{ json: { analyzed_documents: allDocs } }];"
-      },
-      "id": "retrieve-all-results",
-      "name": "Retrieve All Results",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3080,
-        -100
-      ]
+        200
+      ],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -725,14 +741,14 @@
       "main": [
         [
           {
-            "node": "Retrieve All Results",
+            "node": "Analyze Document",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Download from Drive",
+            "node": "Aggregate Analyzed",
             "type": "main",
             "index": 0
           }
@@ -776,7 +792,18 @@
       "main": [
         [
           {
-            "node": "Analyze Document",
+            "node": "Loop Back to Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Back to Batch": {
+      "main": [
+        [
+          {
+            "node": "Split Into Batches",
             "type": "main",
             "index": 0
           }
