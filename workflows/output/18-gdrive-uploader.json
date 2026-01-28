@@ -27,7 +27,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Convert markdown content to file binary\nconst item = $input.first();\nconst content = item.json.content;\nconst fileName = item.json.file_name;\n\n// Create binary data from content\nconst binaryData = Buffer.from(content, 'utf-8').toString('base64');\n\nreturn [{\n  json: item.json,\n  binary: {\n    data: {\n      data: binaryData,\n      mimeType: 'text/markdown',\n      fileName: fileName\n    }\n  }\n}];"
+        "jsCode": "// Convert content to file binary with dynamic mime type\nconst item = $input.first();\nconst content = item.json.content;\nconst fileName = item.json.file_name;\nconst format = item.json.format || 'markdown';\n\n// Determine mime type based on format\nlet mimeType = 'text/markdown';\nif (format === 'html' || fileName.endsWith('.html')) {\n  mimeType = 'text/html';\n} else if (format === 'json' || fileName.endsWith('.json')) {\n  mimeType = 'application/json';\n} else if (format === 'txt' || fileName.endsWith('.txt')) {\n  mimeType = 'text/plain';\n}\n\n// Create binary data from content\nconst binaryData = Buffer.from(content, 'utf-8').toString('base64');\n\nreturn [{\n  json: item.json,\n  binary: {\n    data: {\n      data: binaryData,\n      mimeType: mimeType,\n      fileName: fileName\n    }\n  }\n}];"
       },
       "id": "create-binary",
       "name": "Create Binary Data",
