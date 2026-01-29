@@ -2,414 +2,92 @@
   "name": "19 - Error Orchestrator",
   "nodes": [
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "error-report",
-        "options": {}
-      },
-      "id": "webhook-trigger",
-      "name": "Webhook - Error Report",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "parameters": {},
+      "id": "trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
       "position": [
         0,
         0
       ],
-      "webhookId": "error-orchestrator"
-    },
-    {
-      "parameters": {},
-      "id": "error-trigger",
-      "name": "Error Trigger",
-      "type": "n8n-nodes-base.errorTrigger",
-      "typeVersion": 1,
-      "position": [
-        0,
-        200
-      ]
-    },
-    {
-      "parameters": {},
-      "id": "merge-inputs",
-      "name": "Merge Error Sources",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        220,
-        100
-      ]
+      "typeVersion": 1
     },
     {
       "parameters": {
-        "jsCode": "// Extract and normalize error details\nconst item = $input.first();\nconst data = item.json;\n\n// Handle different error source formats\nlet errorDetails = {\n  error_id: `ERR_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,\n  timestamp: new Date().toISOString(),\n  source: 'unknown',\n  workflow_id: '',\n  workflow_name: '',\n  node_name: '',\n  error_type: 'unknown',\n  error_message: '',\n  retry_count: 0,\n  input_data: null\n};\n\n// From Error Trigger\nif (data.execution) {\n  errorDetails.workflow_id = data.execution.workflowId;\n  errorDetails.workflow_name = data.workflow?.name || '';\n  errorDetails.node_name = data.execution.lastNodeExecuted;\n  errorDetails.error_message = data.execution.error?.message || JSON.stringify(data.execution.error);\n  errorDetails.source = 'error_trigger';\n}\n\n// From Webhook\nif (data.error_message) {\n  errorDetails.error_message = data.error_message;\n  errorDetails.workflow_name = data.workflow_name || '';\n  errorDetails.node_name = data.node_name || '';\n  errorDetails.source = 'webhook';\n}\n\n// Classify error type\nconst msg = errorDetails.error_message.toLowerCase();\nif (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many')) {\n  errorDetails.error_type = 'rate_limit';\n} else if (msg.includes('401') || msg.includes('403') || msg.includes('unauthorized') || msg.includes('forbidden')) {\n  errorDetails.error_type = 'auth_failure';\n} else if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504')) {\n  errorDetails.error_type = 'server_error';\n} else if (msg.includes('timeout') || msg.includes('econnrefused') || msg.includes('network')) {\n  errorDetails.error_type = 'network_error';\n} else if (msg.includes('invalid') || msg.includes('validation') || msg.includes('missing')) {\n  errorDetails.error_type = 'validation_error';\n} else if (msg.includes('quota') || msg.includes('limit exceeded')) {\n  errorDetails.error_type = 'quota_exceeded';\n} else {\n  errorDetails.error_type = 'unknown';\n}\n\nreturn [{ json: errorDetails }];"
+        "jsCode": "const error = $input.first().json;\n\nreturn [{\n  json: {\n    error_type: error.error_type || 'workflow_error',\n    error_message: error.error_message || JSON.stringify(error),\n    workflow_name: error.workflow_name || $workflow.name,\n    execution_id: error.execution_id || $execution.id,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
-      "id": "extract-error",
-      "name": "Extract Error Details",
+      "id": "format",
+      "name": "Format Error",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
       "position": [
-        440,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "rules": {
-          "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.error_type }}",
-                    "rightValue": "rate_limit",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Rate Limit"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.error_type }}",
-                    "rightValue": "server_error",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Server Error"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.error_type }}",
-                    "rightValue": "auth_failure",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Auth Failure"
-            }
-          ],
-          "fallbackOutput": {
-            "renameOutput": true,
-            "outputKey": "Other"
-          }
-        },
-        "options": {}
-      },
-      "id": "route-error",
-      "name": "Route by Error Type",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [
-        660,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 60,
-        "unit": "seconds"
-      },
-      "id": "wait-rate-limit",
-      "name": "Wait - Rate Limit",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        -50
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 30,
-        "unit": "seconds"
-      },
-      "id": "wait-server-error",
-      "name": "Wait - Server Error",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        50
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "manual",
-        "duplicateItem": false,
-        "assignments": {
-          "assignments": [
-            {
-              "id": "i1j2k3l4-1111-2222-3333-444455556666",
-              "name": "action",
-              "value": "notify_high_priority",
-              "type": "string"
-            },
-            {
-              "id": "i1j2k3l4-1111-2222-3333-444455556677",
-              "name": "requires_manual_intervention",
-              "value": "true",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {},
-        "includeOtherFields": true
-      },
-      "id": "set-auth-action",
-      "name": "Set Auth Action",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        880,
-        150
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "manual",
-        "duplicateItem": false,
-        "assignments": {
-          "assignments": [
-            {
-              "id": "j1k2l3m4-1111-2222-3333-444455556666",
-              "name": "action",
-              "value": "log_and_notify",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {},
-        "includeOtherFields": true
-      },
-      "id": "set-other-action",
-      "name": "Set Other Action",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        880,
-        250
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineAll",
-        "options": {}
-      },
-      "id": "merge-actions",
-      "name": "Merge Actions",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        1100,
-        100
-      ]
+        432,
+        0
+      ],
+      "typeVersion": 2
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "mode": "name",
-          "value": "20 - Error Notifier"
+          "mode": "id",
+          "value": "ebJtA5zECwuqgxVl"
         },
-        "options": {}
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
-      "id": "call-notifier",
-      "name": "Send to Notifier",
+      "id": "notify",
+      "name": "Send to Error Notifier",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
       "position": [
-        1320,
-        100
+        672,
+        0
       ],
-      "continueOnFail": true
+      "typeVersion": 1.2
     },
     {
-      "parameters": {
-        "jsCode": "// Log error to output/dead letter queue concept\nconst item = $input.first();\n\nreturn [{\n  json: {\n    error_handled: true,\n    error_id: item.json.error_id,\n    error_type: item.json.error_type,\n    action_taken: item.json.action || 'logged',\n    notification_sent: true,\n    processed_at: new Date().toISOString()\n  }\n}];"
-      },
-      "id": "finalize",
-      "name": "Finalize",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
       "position": [
-        1540,
-        100
-      ]
+        208,
+        0
+      ],
+      "id": "50da02ca-55b3-411b-95a7-1b9edc61de53",
+      "name": "Error Trigger"
     }
   ],
+  "pinData": {},
   "connections": {
-    "Webhook - Error Report": {
+    "Format Error": {
       "main": [
         [
           {
-            "node": "Merge Error Sources",
+            "node": "Send to Error Notifier",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        []
       ]
     },
     "Error Trigger": {
       "main": [
         [
           {
-            "node": "Merge Error Sources",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Error Sources": {
-      "main": [
-        [
-          {
-            "node": "Extract Error Details",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Error Details": {
-      "main": [
-        [
-          {
-            "node": "Route by Error Type",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Route by Error Type": {
-      "main": [
-        [
-          {
-            "node": "Wait - Rate Limit",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Wait - Server Error",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Set Auth Action",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Set Other Action",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait - Rate Limit": {
-      "main": [
-        [
-          {
-            "node": "Merge Actions",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait - Server Error": {
-      "main": [
-        [
-          {
-            "node": "Merge Actions",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Set Auth Action": {
-      "main": [
-        [
-          {
-            "node": "Merge Actions",
-            "type": "main",
-            "index": 2
-          }
-        ]
-      ]
-    },
-    "Set Other Action": {
-      "main": [
-        [
-          {
-            "node": "Merge Actions",
-            "type": "main",
-            "index": 3
-          }
-        ]
-      ]
-    },
-    "Merge Actions": {
-      "main": [
-        [
-          {
-            "node": "Send to Notifier",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send to Notifier": {
-      "main": [
-        [
-          {
-            "node": "Finalize",
+            "node": "Format Error",
             "type": "main",
             "index": 0
           }
@@ -417,17 +95,22 @@
       ]
     }
   },
+  "active": true,
   "settings": {
+    "callerPolicy": "any",
     "executionOrder": "v1"
   },
-  "staticData": null,
+  "versionId": "2666ec3f-fd3a-4b29-994a-34390ad26f6e",
+  "meta": {
+    "instanceId": "09d4a039dbb91046aaeca3edef2db73f8c3066e76e4922019d6c8cb34ee8b520"
+  },
+  "id": "osCKBbpvviwbvt1F",
   "tags": [
     {
+      "updatedAt": "2026-01-27T09:40:10.402Z",
+      "createdAt": "2026-01-27T09:40:10.402Z",
+      "id": "9gCVVtFKroqBPp94",
       "name": "error-handling"
     }
-  ],
-  "triggerCount": 0,
-  "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1",
-  "active": false
+  ]
 }

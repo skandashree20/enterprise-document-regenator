@@ -6,74 +6,75 @@
       "id": "trigger-node",
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1,
       "position": [
         0,
         0
-      ]
+      ],
+      "typeVersion": 1
     },
     {
       "parameters": {
-        "jsCode": "// Build Google Chat notification card\nconst item = $input.first().json;\n\nconst priorityColors = {\n  'auth_failure': '#FF0000',\n  'quota_exceeded': '#FF0000',\n  'rate_limit': '#FFA500',\n  'server_error': '#FFA500',\n  'network_error': '#FFA500',\n  'validation_error': '#FFFF00',\n  'unknown': '#808080'\n};\n\nconst priorityLabels = {\n  'auth_failure': 'HIGH',\n  'quota_exceeded': 'HIGH',\n  'rate_limit': 'MEDIUM',\n  'server_error': 'MEDIUM',\n  'network_error': 'MEDIUM',\n  'validation_error': 'LOW',\n  'unknown': 'LOW'\n};\n\nconst errorType = item.error_type || 'unknown';\nconst priority = priorityLabels[errorType] || 'LOW';\n\n// Google Chat Card format\nconst chatCard = {\n  cards: [{\n    header: {\n      title: '\ud83d\udea8 Document Regeneration Error',\n      subtitle: `${item.workflow_name || 'Unknown Workflow'} - ${priority} Priority`,\n      imageUrl: 'https://developers.google.com/chat/images/quickstart-app-avatar.png',\n      imageStyle: 'AVATAR'\n    },\n    sections: [\n      {\n        widgets: [\n          {\n            keyValue: {\n              topLabel: 'Error ID',\n              content: item.error_id || 'N/A'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Error Type',\n              content: errorType.replace('_', ' ').toUpperCase()\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Node',\n              content: item.node_name || 'Unknown'\n            }\n          },\n          {\n            keyValue: {\n              topLabel: 'Time',\n              content: item.timestamp || new Date().toISOString()\n            }\n          }\n        ]\n      },\n      {\n        header: 'Error Message',\n        widgets: [\n          {\n            textParagraph: {\n              text: (item.error_message || 'No error message available').substring(0, 500)\n            }\n          }\n        ]\n      },\n      {\n        widgets: [\n          {\n            buttons: [\n              {\n                textButton: {\n                  text: 'View in n8n',\n                  onClick: {\n                    openLink: {\n                      url: `${$env.N8N_HOST || 'http://localhost:5678'}/workflow/${item.workflow_id || ''}`\n                    }\n                  }\n                }\n              }\n            ]\n          }\n        ]\n      }\n    ]\n  }]\n};\n\nreturn [{\n  json: {\n    chat_card: chatCard,\n    priority: priority,\n    error_type: errorType,\n    requires_action: item.requires_manual_intervention === 'true'\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\n\n// Parse nested execution error JSON safely\nlet parsedError = {};\nif (typeof item.error_message === \"string\" && item.error_message.startsWith(\"{\")) {\n  try {\n    parsedError = JSON.parse(item.error_message);\n  } catch (e) {}\n}\n\nlet msg = \"\";\n\n// 1️⃣ Node-style errors (if any)\nif (parsedError.errors && parsedError.errors.length > 0) {\n  msg = parsedError.errors.map(e => `${e.node}: ${e.error}`).join(\"\\n\");\n}\n\n// 2️⃣ n8n execution error (YOUR CASE)\nelse if (parsedError.execution?.error?.message) {\n  msg = `${parsedError.execution.error.message}`;\n}\n\n// 3️⃣ fallback raw error_message\nelse if (item.error_message && item.error_message !== \"{}\") {\n  msg = item.error_message;\n}\n\nelse {\n  msg = \"An error occurred\";\n}\n\n// Prefer workflow name from parsed JSON → else original\nconst workflowName =\n  parsedError.workflow?.name ||\n  item.workflow_name ||\n  \"Document Regeneration\";\n\n// IST time\nconst istTime = new Date().toLocaleString(\"en-IN\", {\n  timeZone: \"Asia/Kolkata\",\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit',\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit',\n  hour12: true\n});\n\n// Google Chat payload\nconst response = {\n  text: `🚨 Error in ${workflowName}`,\n  cards: [{\n    sections: [{\n      widgets: [{\n        textParagraph: {\n          text: `<b>${msg}</b>`\n        }\n      }]\n    }, {\n      widgets: [{\n        keyValue: {\n          topLabel: \"Execution ID\",\n          content: item.execution_id || parsedError.execution?.id || \"N/A\"\n        }\n      }, {\n        keyValue: {\n          topLabel: \"Failed Node\",\n          content: parsedError.execution?.lastNodeExecuted || \"Unknown\"\n        }\n      }, {\n        keyValue: {\n          topLabel: \"Time (IST)\",\n          content: istTime\n        }\n      }]\n    }]\n  }]\n};\n\nreturn response;"
       },
       "id": "build-card",
       "name": "Build Chat Card",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
       "position": [
-        220,
+        224,
         0
-      ]
+      ],
+      "typeVersion": 2
     },
     {
       "parameters": {
-        "url": "={{ $env.GOOGLE_CHAT_WEBHOOK_URL || 'https://chat.googleapis.com/v1/spaces/SPACE_ID/messages?key=KEY&token=TOKEN' }}",
+        "method": "POST",
+        "url": "https://chat.googleapis.com/v1/spaces/AAQA1uIwzMA/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=cdSgWap5oFIOBjV5ZX3_B9L3QKj7GguXblLR_V0v4-g",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.chat_card) }}",
+        "jsonBody": "={{ $json }}",
         "options": {}
       },
       "id": "send-notification",
       "name": "Send to Google Chat",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "position": [
-        440,
+        448,
         0
       ],
+      "typeVersion": 4.2,
       "continueOnFail": true
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
             "leftValue": "",
+            "caseSensitive": true,
             "typeValidation": "strict"
           },
+          "combinator": "and",
           "conditions": [
             {
               "id": "check-high-priority",
-              "leftValue": "={{ $json.priority }}",
-              "rightValue": "HIGH",
               "operator": {
                 "type": "string",
                 "operation": "equals"
-              }
+              },
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "HIGH"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
       },
       "id": "check-priority",
       "name": "Check High Priority",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
       "position": [
-        660,
+        672,
         0
-      ]
+      ],
+      "typeVersion": 2
     },
     {
       "parameters": {
@@ -82,33 +83,33 @@
       "id": "high-priority-action",
       "name": "High Priority Action",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
       "position": [
         880,
-        -100
-      ]
+        -96
+      ],
+      "typeVersion": 2
     },
     {
       "parameters": {},
       "id": "no-op",
       "name": "No Additional Action",
       "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
       "position": [
         880,
-        100
-      ]
+        112
+      ],
+      "typeVersion": 1
     },
     {
       "parameters": {},
       "id": "merge-output",
       "name": "Merge Output",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
       "position": [
-        1100,
+        1104,
         0
-      ]
+      ],
+      "typeVersion": 3
     },
     {
       "parameters": {
@@ -117,13 +118,14 @@
       "id": "finalize",
       "name": "Finalize",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
       "position": [
-        1320,
+        1328,
         0
-      ]
+      ],
+      "typeVersion": 2
     }
   ],
+  "pinData": {},
   "connections": {
     "Execute Workflow Trigger": {
       "main": [
@@ -210,17 +212,21 @@
       ]
     }
   },
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
+  "versionId": "a20d65b7-3a32-4ffa-aca0-a5870ab0895a",
+  "meta": {
+    "instanceId": "09d4a039dbb91046aaeca3edef2db73f8c3066e76e4922019d6c8cb34ee8b520"
+  },
+  "id": "ebJtA5zECwuqgxVl",
   "tags": [
     {
+      "updatedAt": "2026-01-27T09:40:10.402Z",
+      "createdAt": "2026-01-27T09:40:10.402Z",
+      "id": "9gCVVtFKroqBPp94",
       "name": "error-handling"
     }
-  ],
-  "triggerCount": 0,
-  "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1",
-  "active": false
+  ]
 }
