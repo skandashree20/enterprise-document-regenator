@@ -1,5 +1,4 @@
 {
-  "id": "Adlw6GFK6dfNNZ7X",
   "name": "12 - Corporate Overview Generator",
   "nodes": [
     {
@@ -8,7 +7,10 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -18,7 +20,10 @@
       "name": "Prepare Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -44,7 +49,10 @@
       "name": "OpenAI - Generate Overview",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "credentials": {
         "openAiApi": {
           "id": "CJCFB3T7mvekmbpe",
@@ -61,7 +69,10 @@
       "name": "Format Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     }
   ],
   "connections": {
@@ -110,5 +121,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }

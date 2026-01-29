@@ -7,7 +7,10 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -17,7 +20,10 @@
       "name": "Prepare File",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -79,7 +85,10 @@
       "name": "Route by Extension",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -90,7 +99,10 @@
       "name": "Extract PPTX",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
-      "position": [660, -150],
+      "position": [
+        660,
+        -150
+      ],
       "continueOnFail": true
     },
     {
@@ -102,7 +114,10 @@
       "name": "Extract XLSX",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -113,7 +128,10 @@
       "name": "Extract Text Content",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 150]
+      "position": [
+        660,
+        150
+      ]
     },
     {
       "parameters": {
@@ -125,7 +143,10 @@
       "name": "Merge Extractions",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -135,7 +156,10 @@
       "name": "Process Content",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     }
   ],
   "connections": {
@@ -242,5 +266,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }

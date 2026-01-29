@@ -1,5 +1,4 @@
 {
-  "id": "DOC_UPDATER_001",
   "name": "21 - Document Updater",
   "nodes": [
     {
@@ -8,7 +7,10 @@
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -18,7 +20,10 @@
       "name": "Extract Research Topics",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -28,7 +33,10 @@
       "name": "Prepare Search Requests",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -47,7 +55,10 @@
       "name": "Serper Search API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "kK1GI05nBZrYdskn",
@@ -64,7 +75,10 @@
       "name": "Parse Search Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -76,7 +90,10 @@
       "name": "Aggregate Search Results",
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -86,7 +103,10 @@
       "name": "Compile Research",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     },
     {
       "parameters": {
@@ -115,7 +135,10 @@
       "name": "Has Research Findings?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1540, 0]
+      "position": [
+        1540,
+        0
+      ]
     },
     {
       "parameters": {
@@ -142,7 +165,10 @@
       "name": "Analyze & Generate Updates",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
-      "position": [1760, -100],
+      "position": [
+        1760,
+        -100
+      ],
       "credentials": {
         "openAiApi": {
           "id": "CJCFB3T7mvekmbpe",
@@ -159,7 +185,10 @@
       "name": "Format Update Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1980, -100]
+      "position": [
+        1980,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -169,7 +198,10 @@
       "name": "No Updates Available",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 100]
+      "position": [
+        1760,
+        100
+      ]
     },
     {
       "parameters": {},
@@ -177,7 +209,10 @@
       "name": "Merge Output",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [2200, 0]
+      "position": [
+        2200,
+        0
+      ]
     }
   ],
   "connections": {
@@ -321,5 +356,6 @@
   ],
   "triggerCount": 0,
   "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }
