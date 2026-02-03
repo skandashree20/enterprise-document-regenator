@@ -223,6 +223,11 @@ Main Orchestrator
 | --- | ----------------------------- | ------------------------------------------------ |
 | 01  | Main Orchestrator             | Main workflow that coordinates all sub-workflows |
 | 02  | Google Drive Scanner          | Scans folders for documents                      |
+| 03  | Document Fetcher              | Downloads documents from Google Drive            |
+| 04  | Batch Router                  | Routes documents by MIME type for processing    |
+| 05  | PDF Processor                 | Extracts text from PDF files                    |
+| 06  | DOCX Processor                | Extracts text from Word documents               |
+| 07  | Generic Processor             | Handles other file types via Tika               |
 | 08  | Document Analyzer OpenAI      | Analyzes documents with GPT-4                    |
 | 09  | Document Analyzer Gemini      | Analyzes documents with Gemini                   |
 | 10  | External Data Enricher        | Fetches external enrichment data                 |
@@ -230,11 +235,13 @@ Main Orchestrator
 | 12  | Corporate Overview Generator  | Generates corporate overview docs                |
 | 13  | Product Datasheet Generator   | Generates product datasheets                     |
 | 14  | Higher Ed One-Pager Generator | Generates higher ed one-pagers                   |
+| 15  | Client Document Generator     | Generates client-specific documents              |
 | 16  | Visual Asset Generator        | Generates visuals for documents                  |
 | 18  | Google Drive Uploader         | Uploads documents to Drive                       |
 | 19  | Error Orchestrator            | Handles workflow errors                          |
 | 20  | Error Notifier                | Sends error notifications                        |
 | 21  | Document Updater              | Checks for and applies document updates          |
+| 23  | Two-Model Consensus           | Combines OpenAI + Gemini analysis for accuracy  |
 
 ---
 
