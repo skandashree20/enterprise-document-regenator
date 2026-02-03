@@ -14,6 +14,16 @@ This system:
 6. Checks for document updates using external research (Serper API)
 7. Uploads generated documents to Google Drive
 
+### Features
+
+- **Batch Processing**: Configurable batch size with parallel processing
+- **Error Handling**: Categorized errors with Google Chat notifications  
+- **External Research**: Serper API integration for industry insights
+- **MIME Type Routing**: Optimized text extraction for different file types
+- **Real-time Notifications**: Google Chat integration for alerts
+- **Automatic Retries**: Smart retry logic for recoverable errors
+- **Progress Tracking**: Batch processing with status monitoring
+
 ## Prerequisites
 
 - Docker and Docker Compose
@@ -68,7 +78,7 @@ You should see:
 Run the import script from the project root:
 
 ```bash
-./scripts/import-workflows.sh
+./scripts/workflow-manager.sh import
 ```
 
 This script automatically:
@@ -78,7 +88,7 @@ This script automatically:
 3. Fixes workflow ID references in Main Orchestrator
 4. Sets correct execution modes (`Run once for each item`)
 
-**Important**: The import script handles workflow ID mismatches automatically. When workflows are imported, they get new database IDs. The `fix-workflow-ids.sh` script (called by the import) looks up the actual IDs by workflow name and updates the Main Orchestrator accordingly.
+**Important**: The import script handles workflow ID mismatches automatically. When workflows are imported, they get new database IDs. The workflow manager looks up the actual IDs by workflow name and updates the Main Orchestrator accordingly.
 
 ### Step 5: Configure Credentials in n8n
 
@@ -160,23 +170,31 @@ curl -X POST http://localhost:5680/webhook/run-regeneration
 
 | Script                          | Purpose                                 |
 | ------------------------------- | --------------------------------------- |
-| `scripts/import-workflows.sh`   | Complete workflow import with all fixes |
-| `scripts/fix-workflow-ids.sh`   | Fix workflow ID references after import |
-| `scripts/fix-workflow-modes.sh` | Fix Execute Workflow node modes         |
+| `scripts/workflow-manager.sh`   | **Unified management tool**            |
+| `scripts/workflow-functions.sh` | Shared workflow functions library       |
 
-### When to Use Each Script
+### Workflow Management
 
-**After cloning the repo:**
-
-```bash
-./scripts/import-workflows.sh
-```
-
-**After manually importing workflows via n8n UI:**
+Use the unified tool for all operations:
 
 ```bash
-./scripts/fix-workflow-ids.sh
-./scripts/fix-workflow-modes.sh
+# Full import with all fixes
+./scripts/workflow-manager.sh import
+
+# Fix workflow references only
+./scripts/workflow-manager.sh fix-ids
+
+# Fix execution modes only  
+./scripts/workflow-manager.sh fix-modes
+
+# Show workflow status
+./scripts/workflow-manager.sh status
+
+# Apply enhancements
+./scripts/workflow-manager.sh enhance
+
+# Reset database (WARNING: deletes all data)
+./scripts/workflow-manager.sh reset
 ```
 
 ---
@@ -227,7 +245,7 @@ Main Orchestrator
 If you see "The workflow with ID X does not exist" after import:
 
 ```bash
-./scripts/fix-workflow-ids.sh
+./scripts/workflow-manager.sh fix-ids
 ```
 
 ### Execute Workflow mode reset
@@ -235,7 +253,7 @@ If you see "The workflow with ID X does not exist" after import:
 If Execute Workflow nodes are set to "Run once with all items" instead of "Run once for each item":
 
 ```bash
-./scripts/fix-workflow-modes.sh
+./scripts/workflow-manager.sh fix-modes
 ```
 
 ### Tika connection error
@@ -281,7 +299,7 @@ cd docker
 docker compose down -v  # This deletes all data!
 docker compose up -d
 # Then re-import workflows
-./scripts/import-workflows.sh
+./scripts/workflow-manager.sh import
 ```
 
 ---
