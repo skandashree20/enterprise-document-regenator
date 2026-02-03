@@ -282,6 +282,24 @@
               "name": "batch_size",
               "value": "5",
               "type": "number"
+            },
+            {
+              "id": "var6",
+              "name": "google_chat_webhook",
+              "value": "https://chat.googleapis.com/v1/spaces/YOUR_SPACE/messages?key=YOUR_KEY",
+              "type": "string"
+            },
+            {
+              "id": "var7",
+              "name": "company_snippet",
+              "value": "We are OneOrigin, transforming higher education through AIRR technology and digital credential management. Our focus is on FERPA-compliant transcript processing and seamless SIS integrations.",
+              "type": "string"
+            },
+            {
+              "id": "var8",
+              "name": "error_notification_enabled",
+              "value": true,
+              "type": "boolean"
             }
           ]
         },
@@ -603,6 +621,80 @@
         200
       ],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error handler for workflow failures\nconst errorData = $input.first().json;\nconst initVars = $('Initialize Variables').first().json;\n\nconst errorReport = {\n  timestamp: new Date().toISOString(),\n  workflow: 'Main Orchestrator',\n  error_message: errorData.error?.message || errorData.message || 'Unknown error',\n  node_name: errorData.node?.name || 'Unknown node',\n  execution_id: initVars.execution_id,\n  webhook_url: initVars.google_chat_webhook\n};\n\nreturn [{ json: errorReport }];"
+      },
+      "id": "handle-error",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.webhook_url }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "🚨 Error in Document Regeneration\\n\\nWorkflow: {{ $json.workflow }}\\nNode: {{ $json.node_name }}\\nError: {{ $json.error_message }}\\nTime: {{ $json.timestamp }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-error-notification",
+      "name": "Send Error to Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4200,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Success notification\nconst initVars = $('Initialize Variables').first().json;\nconst uploadResult = $input.first().json;\n\nreturn [{\n  json: {\n    message: `✅ Document regeneration completed successfully! Generated ${uploadResult.uploaded_count || 0} documents.`,\n    webhook_url: initVars.google_chat_webhook,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "success-notification",
+      "name": "Success Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.webhook_url }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "{{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-success-notification",
+      "name": "Send Success to Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4200,
+        100
+      ],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -819,6 +911,15 @@
             "index": 0
           }
         ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Accumulate Results": {
@@ -975,7 +1076,40 @@
       "main": [
         [
           {
+            "node": "Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Success to Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Success to Chat": {
+      "main": [
+        [
+          {
             "node": "Notify Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error to Chat",
             "type": "main",
             "index": 0
           }
